@@ -1,0 +1,1752 @@
+[
+{
+  "model": "exit_exams.question",
+  "pk": 37,
+  "fields": {
+    "topic": 9,
+    "text": "Why should form <input> elements include an associated <label> with the for attribute?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-25T13:12:14.160Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 38,
+  "fields": {
+    "topic": 9,
+    "text": "Which one of the following is not feature of dynamic web page?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-25T13:12:31.744Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 39,
+  "fields": {
+    "topic": 6,
+    "text": "Why should form <input> elements include an associated <label> with the for attribute?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It improves accessibility: screen readers announce the label when the input is focused. Question number 100 Answer: C",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:19:05.283Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 40,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is not feature of dynamic web page?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Contain the same prebuilt content each time the page is loaded.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:19:13.073Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 41,
+  "fields": {
+    "topic": 6,
+    "text": "Consider nav ul { list-style-type: none; margin: 0; padding: 0; } What problem does this solve when creating a navigation bar?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Removes bullet points and default spacing, allowing custom layout.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.757Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 42,
+  "fields": {
+    "topic": 6,
+    "text": "Which AI approach most directly supports understanding biological intelligence behavior as a scientific goal?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Cognitive AI",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.765Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 43,
+  "fields": {
+    "topic": 6,
+    "text": "In client-server database architecture, what is the primary role of the server?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Store and manage shared data, enforce ACID properties, and process client requests.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.771Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 44,
+  "fields": {
+    "topic": 6,
+    "text": "Which automaton is powerful enough to recognize the language L = {aⁿbⁿcⁿ | n ≥ 1}?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Linear Bounded Automaton (LBA)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.777Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 45,
+  "fields": {
+    "topic": 6,
+    "text": "In two-phase locking (2PL), during which phase may a transaction acquire locks but not release any?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Growing phase",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.785Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 46,
+  "fields": {
+    "topic": 6,
+    "text": "To extend the connectivity of processor bus we use:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Multi bus",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.797Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 47,
+  "fields": {
+    "topic": 6,
+    "text": "Combinational circuit differ from sequential circuit primarily because",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "The output of combinational circuit depends only on the present input, not on past output.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.811Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 48,
+  "fields": {
+    "topic": 6,
+    "text": "Why is Greedy Best-First Search not guaranteed to be optimal or complete?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It ignores path cost g(n) and relies only on h(n).",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.818Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 49,
+  "fields": {
+    "topic": 6,
+    "text": "From the following statement which is correct about this pointer in c++?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "This pointer passed as hidden argument in all non-static variables of the class.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.825Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 50,
+  "fields": {
+    "topic": 6,
+    "text": "In class diagram, if class Car has solid diamond points to class Engine, what does this indicates?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Engine is the part of Car and cannot exist without it.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.833Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 51,
+  "fields": {
+    "topic": 6,
+    "text": "The amount of time the algorithm takes on the smallest possible set of inputs is called_____",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Best time",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.840Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 52,
+  "fields": {
+    "topic": 6,
+    "text": "For a weak entity set to be meaningful, it must be associated with another entity set, called the",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Strong entity set",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.847Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 53,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is not the application level service?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Installing a new service",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.856Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 54,
+  "fields": {
+    "topic": 6,
+    "text": "A language that allows the DBA or user to describe and name the entities, attributes, and relationships required for the application is__________",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Data Definition Language (DDL)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.864Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 55,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is linear data structure?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Array",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.872Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 56,
+  "fields": {
+    "topic": 6,
+    "text": "What is the main purpose of syntax-directed translation in a compiler?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "To interleave semantic analysis with syntax analysis using attributes attached to grammar symbols.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.879Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 57,
+  "fields": {
+    "topic": 6,
+    "text": "What will be the output of the following program segment? public class Calculation { public static void main(String[] args) { int sum = 0; for(int j = 1; j<=10; j++) { sum = sum + j; } System.out.println(+sum); }",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "55",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.887Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 58,
+  "fields": {
+    "topic": 6,
+    "text": "Which keyword is used in Java to create a subclass that inherits from a superclass?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Extends",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.894Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 59,
+  "fields": {
+    "topic": 6,
+    "text": "What is the output of the following C++ code fragment? Int a=6, b=8; Int x=2, y=4; Int c(x>y? (a--; x): (b--; y)); Cout<<”a”<<a; Cout<<” b=”<<b; Cout <<” c=”<<c;",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "a=6 b=7 c=4",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.902Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 60,
+  "fields": {
+    "topic": 6,
+    "text": "___________is a collection of related fields that can be treated as a unit by some application program.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Record",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.912Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 61,
+  "fields": {
+    "topic": 6,
+    "text": "Straight directed translation uses:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Grammar with semantic rule",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.919Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 62,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is the first operation or step in CPU instruction cycle?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Fetching the instruction",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.926Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 63,
+  "fields": {
+    "topic": 6,
+    "text": "Which search strategy tries to expand the node that is closest to the goal, on the grounds that this is likely to lead to a solution quickly; Thus, it evaluates nodes by using just the heuristic function: f ( n) = h ( n).",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Greedy best-first search",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.933Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 64,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is a top-down parser without backtracking?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Predictive parser",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.940Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 65,
+  "fields": {
+    "topic": 6,
+    "text": "How many layers are there in OSI reference model?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "7",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.947Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 66,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is a computer structural component that provides for communication among CPU, main memory and I/O?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "System interconnection",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.953Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 67,
+  "fields": {
+    "topic": 6,
+    "text": "Assume that we are able to specify that Mr. Getahun can view the database record, but cannot change the value of the record. Which security management technique was used in this scenario?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Access Control",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.959Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 68,
+  "fields": {
+    "topic": 6,
+    "text": "Suppose, a developer proposes using deferred update with no checkpoints in a high- transaction OLTP system. What is the most serious drawback?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Log scans become prohibitively expensive after long uptime.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.965Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 69,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following function of operating system is categorized under process management?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Allocates the processor (CPU) to a process.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.971Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 70,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following statements is TRUE?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Every regular language is context-free.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.977Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 71,
+  "fields": {
+    "topic": 6,
+    "text": "____________ is a data transfer method in computer organization and architecture that allows an I/O device to transfer data directly to or from memory without the involvement of the CPU.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Direct Memory Access (DMA)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.983Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 72,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following php method is used to retrieve the information from the form control through the parameters sent in the URL?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "$_GET[]",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.990Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 73,
+  "fields": {
+    "topic": 6,
+    "text": "Which statement is NOT true about digital signature?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "In digital signature, Sender encrypts message with its public key.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:41.996Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 74,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following ip address class uses first two octets for network addresses and last two for host addressing?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Class B",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.002Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 75,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following best defines a heuristic in the context of AI search?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "A function that estimates how close a state is to the goal.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.009Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 76,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following party performs the technical evaluation work, using the evidence supplied by the developers, and additional testing of the product, to confirm that it satisfies the functional and assurance requirements specified in the security target?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Evaluator",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.015Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 77,
+  "fields": {
+    "topic": 6,
+    "text": "Assume that you have a huge company like university; bank industry, etc. have their own data center to store and control the different type of the data. Which type of RAID technology is the most preferable to use?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "RAID level 1",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.021Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 78,
+  "fields": {
+    "topic": 6,
+    "text": "Which analysis technique is INAPPROPRIATE for determining the lower bound of comparison-based sorting, and why?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Recurrence relations — because sorting isn’t naturally recursive.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.026Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 79,
+  "fields": {
+    "topic": 6,
+    "text": "In CSS, which property is used to change the text color of an element?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "color",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.033Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 80,
+  "fields": {
+    "topic": 6,
+    "text": "From the flowing function which one is used to create the table",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "CREATE TABLE table_name (column_name, column type);",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.039Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 81,
+  "fields": {
+    "topic": 6,
+    "text": "What is the primary function of an operating system?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "To act as an intermediary between users and computer hardware.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.045Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 82,
+  "fields": {
+    "topic": 6,
+    "text": "How much time units or T( n) taken to compute the following piece of code? int total(int n) { ini int sum=0; for (int i=1;i<=n;i++) sum=sum+1; return sum; }",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "6n+2",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.051Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 83,
+  "fields": {
+    "topic": 6,
+    "text": "An object oriented principle that contains information in an object, exposing only selected information is____________.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Encapsulation",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.057Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 84,
+  "fields": {
+    "topic": 6,
+    "text": "Stack is follows ____policy:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "LIFO",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.062Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 85,
+  "fields": {
+    "topic": 6,
+    "text": "From the following alternatives which one is FALSE about database system?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It is very difficult to protect a file under the system.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.068Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 86,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is categorized under Log based Recovery Techniques in database?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "ARIES Recovery Algorithm",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.074Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 87,
+  "fields": {
+    "topic": 6,
+    "text": "What is the first step to convert context free grammar (CFG) into Greibach Normal Form (GNF)?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "If the grammar exists left recursion, eliminate it.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.080Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 88,
+  "fields": {
+    "topic": 6,
+    "text": "A user installs a new printer. The OS automatically detects and configures it. This is an example of:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Plug-and-play functionality",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.085Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 89,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following is NOT property of an algorithm?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Platform dependence",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.091Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 90,
+  "fields": {
+    "topic": 6,
+    "text": "Which Redundant Array of Independent Disks (RAID) is known by striping with parity and fault tolerance?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "RAID 5",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.097Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 91,
+  "fields": {
+    "topic": 6,
+    "text": "Assume that you are computer science expert and you need to develop large programs within short period of time. Finally, you have planned to provide portable program to the concerned body. Which type of programming language is preferable for the above scenario?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "High level",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.103Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 92,
+  "fields": {
+    "topic": 6,
+    "text": "Which type of heuristic search strategy that evaluates nodes by combining g ( n), the cost to reach the node, and h ( n.), the cost to get from the node to the goal: f ( n) = g ( n) + h ( n) Since g( n) gives the path cost from the start node to node n, and h( n) is the estimated cost of the cheapest path from n to the goal, we have f ( n) = estimated cost of the cheapest solution through n ?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "* search",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.109Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 93,
+  "fields": {
+    "topic": 6,
+    "text": "If input is “a” is for syntax tree, which function is used to create tree?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "mknode(op, left, right)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.116Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 94,
+  "fields": {
+    "topic": 6,
+    "text": "Suppose Mr. Negesa might act as Mr. Dereje and send message to Registrar X, the registrar might be lead to believe that message indeed come from Mr. Dereje. What types of attack Mr. Negesa has committed?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Masquerade",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.121Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 95,
+  "fields": {
+    "topic": 6,
+    "text": "From the following statement which one is disadvantage of waterfall model?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Not suitable for projects where requirements are at a moderate to high risk of changing.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.127Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 96,
+  "fields": {
+    "topic": 6,
+    "text": "Consider a directed line(->) from the relationship set advisor to both entity sets instructor and student. This indicates _________ cardinality",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Many to one",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.133Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 97,
+  "fields": {
+    "topic": 6,
+    "text": "In a system, resources cannot be forcibly taken from processes; they must be released voluntarily. Which deadlock condition does this represent?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "No Preemption",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.138Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 98,
+  "fields": {
+    "topic": 6,
+    "text": "Which statement is WRONGLY described about code generation?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Code generation can be considered as the start phase of compilation.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.148Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 99,
+  "fields": {
+    "topic": 6,
+    "text": "____________is a service that allows organizations and individuals to post a website or a web page onto the Internet.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Web hosting",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.153Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 100,
+  "fields": {
+    "topic": 6,
+    "text": "In singly linked list, the node contains",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Data and one pointer (the next node)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.159Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 101,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following statement is non-functional requirement?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "The system respond to user’s request within 2 seconds under normal load.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.165Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 102,
+  "fields": {
+    "topic": 6,
+    "text": "In object design, what does the contract typically includes?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Invariants, preconditions, post conditions.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.171Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 103,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following OSI layers is NOT correctly matched to its corresponding data Units (PDU)?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Network layer ---> Frame.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.177Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 104,
+  "fields": {
+    "topic": 6,
+    "text": "Which data structure follows LIFO principle?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Stacks",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.182Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 105,
+  "fields": {
+    "topic": 6,
+    "text": "Consider the following code snippet class Animal { void sound() { System.out.println(\"Animal sound\"); } } class Dog extends Animal { void sound() { System.out.println(\"Bark!\"); } } Which OOP concept is illustrated when Dog provides its own version of sound?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Method overriding",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.188Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 106,
+  "fields": {
+    "topic": 6,
+    "text": "Which type of grammar is used to generate all possible patterns of strings in a given formal language?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Recursively enumerable",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.194Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 107,
+  "fields": {
+    "topic": 6,
+    "text": "Which tool is used to troubleshoot the network connectivity?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Ping",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.200Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 108,
+  "fields": {
+    "topic": 6,
+    "text": "The time complexity for binary search is__________",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "O(log n)",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.206Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 109,
+  "fields": {
+    "topic": 6,
+    "text": "Which type of access specifier is accessible within the same package or subclasses in a different package?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Protected",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.211Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 110,
+  "fields": {
+    "topic": 6,
+    "text": "What is the basic goal of Normalization?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "To reduce redundancy",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.220Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 111,
+  "fields": {
+    "topic": 6,
+    "text": "Which protocol is mostly used for communication between client and server in a web application?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "HTTP",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.226Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 112,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following layers is responsible for encryption, translation and compression?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Presentation layer",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.231Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 113,
+  "fields": {
+    "topic": 6,
+    "text": "What is the extension of JavaScript file?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": ".JS",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.236Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 114,
+  "fields": {
+    "topic": 6,
+    "text": "Why is perception still a challenge for AI—even though systems can recognize faces?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Because perception requires common-sense knowledge and robust natural language understanding in open ended worlds.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.241Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 115,
+  "fields": {
+    "topic": 6,
+    "text": "Which service used to translate domain names to ip address?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "DNS",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.247Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 116,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of following monitors incoming and outgoing network traffic and decides whether to allow or block specific traffic based on a defined set of security rules?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Firewall",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.252Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 117,
+  "fields": {
+    "topic": 6,
+    "text": "Consider attributes ID, CITY and NAME. Which one of this can be considered as a super key?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "CITY, ID",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.258Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 118,
+  "fields": {
+    "topic": 6,
+    "text": "You want to ensure that a method calculateTax() in class Employee cannot be overridden by any subclass. What declaration achieves this?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Final double calculateTax(){…}",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.263Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 119,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following identifier name is INVALID in C++ programming language?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "delete",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.269Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 120,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following UML building block that defines the static part of the model and represents physical and conceptual elements?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Structural things",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.274Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 121,
+  "fields": {
+    "topic": 6,
+    "text": "Which scenario is best suited for UDP rather than TCP protocol?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Live video streaming",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.280Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 122,
+  "fields": {
+    "topic": 6,
+    "text": "Which type of transparency in distributed database system distributes a relation into sub relations where each sub relation is defined by a subset of the columns of the original relation?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Vertical",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.285Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 123,
+  "fields": {
+    "topic": 6,
+    "text": "In which of the following Learning methods an agent receives feedback in the form of rewards or penalties to maximize cumulative reward?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Reinforcement learning",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.291Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 124,
+  "fields": {
+    "topic": 6,
+    "text": "After deploying a new software system, users reports that the system slows during peak hour. Which software quality attribute primarily affected?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Performance",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.297Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 125,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is WRONGLY stated about an importance of security policy?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "To use the system in a passive way.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.302Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 126,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following is NOT a task of the lexical analyzer?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Generating parse trees",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.309Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 127,
+  "fields": {
+    "topic": 6,
+    "text": "Which sorting algorithm compares each pair of adjacent elements from the beginning of an array and, if they are in reversed order, swaps them; if at least one swaps has been done, repeat step 1.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Bubble sort",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.314Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 128,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following computer security goal prevents the disclosure of sensitive information to unauthorized users or systems on computer networks?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Confidentiality",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.320Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 129,
+  "fields": {
+    "topic": 6,
+    "text": "Assume that you have IPv4 addresses in binary notation 11000001 10000011 00011011 11111111 and you are requested to change into dotted decimal notation. What is the equivalent IP address in decimal dotted notation?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "193.131.27.255",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.325Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 130,
+  "fields": {
+    "topic": 6,
+    "text": "ou have given that Grammar G1 −({S, A, B}, {a, b}, S, {S → AB, A → a, B → b}). Which one is terminal symbol in the give?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "a, b",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.330Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 131,
+  "fields": {
+    "topic": 6,
+    "text": "Among the following one is NOT the application of queue in the real world.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It is used in Depth First search.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.337Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 132,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is disadvantage of circuit switching?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Limited scalability",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.344Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 133,
+  "fields": {
+    "topic": 6,
+    "text": "A developer stores user login status in both $_SESSION['user_id'] on the server document.cookie = \"logged_in=1\" on the client An attacker tampers with cookies to set logged_in=1 without authenticating. Which statement is the most accurate?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "The system is vulnerable — cookie-only checks bypass server session validation.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.349Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 134,
+  "fields": {
+    "topic": 6,
+    "text": "The language L = {wwᴿ | w ∈ {a, b}*} (even-length palindromes) is:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Non-deterministic CFL but not deterministic",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.354Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 135,
+  "fields": {
+    "topic": 6,
+    "text": "______________is one of the candidate keys chosen by the database designer to uniquely identify the entity set.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Primary key",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.359Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 136,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following statement about function overloading is TRUE?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Overload function have same name but different parameters/type.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.365Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 137,
+  "fields": {
+    "topic": 6,
+    "text": "How does an operating system improve efficiency in a multi-user environment?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "By using time-sharing and process scheduling to allocate CPU time fairly among users and processes.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-26T14:20:42.370Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 138,
+  "fields": {
+    "topic": 15,
+    "text": "One difference between Unix and Windows systems is:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-27T11:13:58.795Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 139,
+  "fields": {
+    "topic": 15,
+    "text": "What is a common feature of modern operating systems?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-27T11:15:03.088Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 140,
+  "fields": {
+    "topic": 13,
+    "text": "What is one of the main goals of system administration?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:43.988Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 141,
+  "fields": {
+    "topic": 13,
+    "text": "Which of the following distinguishes Unix-like systems from Windows systems?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.013Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 142,
+  "fields": {
+    "topic": 13,
+    "text": "Which Linux distribution is known for stability and used primarily in servers?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.033Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 143,
+  "fields": {
+    "topic": 13,
+    "text": "What is the topmost directory in a Linux file system hierarchy?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.050Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 144,
+  "fields": {
+    "topic": 13,
+    "text": "Which command is used to mount a file system in Linux?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.065Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 145,
+  "fields": {
+    "topic": 13,
+    "text": "Which of the following commands is used to list files and directories in the shell?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.079Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 146,
+  "fields": {
+    "topic": 13,
+    "text": "Which command is used to start a new process in Linux?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.094Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 147,
+  "fields": {
+    "topic": 13,
+    "text": "Which of the following represents an advanced shell feature?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.109Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 148,
+  "fields": {
+    "topic": 13,
+    "text": "Which of the following best describes a Unix file system hierarchy?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.123Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 149,
+  "fields": {
+    "topic": 13,
+    "text": "Which command is used to change the ownership of a file in Linux?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.138Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 150,
+  "fields": {
+    "topic": 13,
+    "text": "What is the role of the init process in Linux?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.156Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 151,
+  "fields": {
+    "topic": 13,
+    "text": "Which of the following is a key challenge in system administration?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T11:38:44.169Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 152,
+  "fields": {
+    "topic": 6,
+    "text": "Why should form <input> elements include an associated <label> with the for attribute?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It improves accessibility: screen readers announce the label when the input is focused. Question number 100 Answer: C",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.633Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 153,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is not feature of dynamic web page?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Contain the same prebuilt content each time the page is loaded.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.676Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 154,
+  "fields": {
+    "topic": 6,
+    "text": "How does an operating system improve efficiency in a multi-user environment?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "By using time-sharing and process scheduling to allocate CPU time fairly among users and processes.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.721Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 155,
+  "fields": {
+    "topic": 6,
+    "text": "Which of the following statement about function overloading is TRUE?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Overload function have same name but different parameters/type.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.775Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 156,
+  "fields": {
+    "topic": 6,
+    "text": "______________is one of the candidate keys chosen by the database designer to uniquely identify the entity set.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Primary key",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.821Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 157,
+  "fields": {
+    "topic": 6,
+    "text": "The language L = {wwᴿ | w ∈ {a, b}*} (even-length palindromes) is:",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Non-deterministic CFL but not deterministic",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.845Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 158,
+  "fields": {
+    "topic": 6,
+    "text": "A developer stores user login status in both $_SESSION['user_id'] on the server document.cookie = \"logged_in=1\" on the client An attacker tampers with cookies to set logged_in=1 without authenticating. Which statement is the most accurate?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "The system is vulnerable — cookie-only checks bypass server session validation.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.887Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 159,
+  "fields": {
+    "topic": 6,
+    "text": "Which one of the following is disadvantage of circuit switching?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "Limited scalability",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.934Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 160,
+  "fields": {
+    "topic": 6,
+    "text": "Among the following one is NOT the application of queue in the real world.",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "It is used in Depth First search.",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.960Z"
+  }
+},
+{
+  "model": "exit_exams.question",
+  "pk": 161,
+  "fields": {
+    "topic": 6,
+    "text": "ou have given that Grammar G1 −({S, A, B}, {a, b}, S, {S → AB, A → a, B → b}). Which one is terminal symbol in the give?",
+    "bloom_level": "knowledge",
+    "difficulty": "medium",
+    "explanation": "a, b",
+    "created_by": 1,
+    "is_active": true,
+    "created_at": "2026-05-31T12:49:43.990Z"
+  }
+}
+]
