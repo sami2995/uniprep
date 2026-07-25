@@ -3,12 +3,62 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 
+class Department(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
 class Course(models.Model):
     name = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True)
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="courses"
+    )
 
     def __str__(self):
         return self.name
+
+
+class TeacherCourseAssignment(models.Model):
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="course_assignments",
+        limit_choices_to={"role": "teacher"}
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="teacher_assignments"
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("teacher", "course")
+        ordering = ["course__name", "teacher__username"]
+
+    def clean(self):
+        if self.teacher and getattr(self.teacher, "role", None) != "teacher":
+            raise ValidationError("Only TEACHER users can be assigned to courses.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.teacher.username} - {self.course.name}"
 
 
 class Domain(models.Model):
@@ -54,6 +104,17 @@ class Topic(models.Model):
 
 
 class Question(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        ARCHIVED = "archived", "Archived"
+
+    class SourceType(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        IMPORTED = "imported", "Imported"
+
     class BloomLevel(models.TextChoices):
         KNOWLEDGE = "knowledge", "Knowledge"
         COMPREHENSION = "comprehension", "Comprehension"
@@ -89,6 +150,48 @@ class Question(models.Model):
         blank=True,
         related_name="created_questions"
     )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_questions"
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_questions"
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_questions"
+    )
+    originating_pdf_import = models.ForeignKey(
+        "ExamPdfImport",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_questions"
+    )
+    source_type = models.CharField(
+        max_length=20,
+        choices=SourceType.choices,
+        default=SourceType.MANUAL
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -97,6 +200,8 @@ class Question(models.Model):
             models.Index(fields=["topic"]),
             models.Index(fields=["difficulty"]),
             models.Index(fields=["bloom_level"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["created_by"]),
         ]
 
     def __str__(self):
@@ -248,6 +353,7 @@ class ExamPdfImport(models.Model):
         UPLOADED = "uploaded", "Uploaded"
         PROCESSING = "processing", "Processing"
         NEEDS_REVIEW = "needs_review", "Needs Review"
+        SUBMITTED = "submitted", "Submitted"
         APPROVED = "approved", "Approved"
         FAILED = "failed", "Failed"
 
@@ -285,6 +391,14 @@ class ExamPdfImport(models.Model):
         related_name="uploaded_exam_pdfs"
     )
 
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="submitted_exam_pdfs"
+    )
+
     status = models.CharField(
         max_length=30,
         choices=Status.choices,
@@ -295,6 +409,7 @@ class ExamPdfImport(models.Model):
     error_message = models.TextField(blank=True)
 
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.title
@@ -303,6 +418,7 @@ class ExamPdfImport(models.Model):
 class ExtractedQuestion(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
 
@@ -388,9 +504,35 @@ class ExamBlueprint(models.Model):
 
     duration_minutes = models.PositiveIntegerField(default=180)
 
-    bloom_distribution = models.JSONField( default=dict, blank=True )
-    
+    pass_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=50.00
+    )
+
+    marks_per_question = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=1.00
+    )
+
+    bloom_distribution = models.JSONField(default=dict, blank=True)
+
+    difficulty_distribution = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='e.g. {"easy": 30, "medium": 50, "hard": 20}'
+    )
+
     is_active = models.BooleanField(default=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_blueprints"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -445,3 +587,77 @@ class ExamBlueprintTopicRule(models.Model):
             f"{self.blueprint} - "
             f"{self.topic.name}: {self.question_count}"
         )
+
+
+class AuditLog(models.Model):
+    class Action(models.TextChoices):
+        CREATED = "created", "Created"
+        UPDATED = "updated", "Updated"
+        SUBMITTED = "submitted", "Submitted"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        BLUEPRINT_CHANGED = "blueprint_changed", "Blueprint Changed"
+        ASSIGNMENT_CHANGED = "assignment_changed", "Assignment Changed"
+        SYSTEM_SETTINGS_UPDATED = "system_settings_updated", "System Settings Updated"
+        USER_DEACTIVATED = "user_deactivated", "User Deactivated"
+        USER_REACTIVATED = "user_reactivated", "User Reactivated"
+        PASSWORD_RESET_BY_ADMIN = "password_reset_by_admin", "Password Reset By Admin"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs"
+    )
+    action = models.CharField(
+        max_length=30,
+        choices=Action.choices
+    )
+    entity_type = models.CharField(
+        max_length=50,
+        help_text="e.g. question, blueprint, assignment"
+    )
+    entity_id = models.PositiveIntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    previous_value = models.JSONField(default=dict, blank=True)
+    new_value = models.JSONField(default=dict, blank=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["entity_type", "entity_id"]),
+            models.Index(fields=["user"]),
+            models.Index(fields=["action"]),
+            models.Index(fields=["-timestamp"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.user} - {self.action} - "
+            f"{self.entity_type}#{self.entity_id}"
+        )
+
+
+class SystemSettings(models.Model):
+    """Singleton — only one row should ever exist."""
+    default_passing_score = models.PositiveIntegerField(default=50)
+    default_exam_duration_minutes = models.PositiveIntegerField(default=60)
+    max_battle_participants = models.PositiveIntegerField(default=8)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "System Settings"
+

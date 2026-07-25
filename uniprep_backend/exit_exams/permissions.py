@@ -1,13 +1,40 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
+ADMIN_ROLES = {"department_head", "system_admin", "admin"}
+
+
+class IsSystemAdminOnly(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            user
+            and user.is_authenticated
+            and getattr(user, "role", None) == "system_admin"
+        )
+
+
 class IsAdminRole(BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return (
             user
             and user.is_authenticated
-            and (user.is_staff or getattr(user, "role", None) == "admin")
+            and (user.is_staff or getattr(user, "role", None) in ADMIN_ROLES)
+        )
+
+
+class IsDepartmentHeadOrSystemAdmin(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            user
+            and user.is_authenticated
+            and (
+                user.is_staff
+                or getattr(user, "role", None)
+                in {"department_head", "system_admin", "admin"}
+            )
         )
 
 
@@ -18,6 +45,26 @@ class IsStudentRole(BasePermission):
             user
             and user.is_authenticated
             and getattr(user, "role", None) == "student"
+        )
+
+
+class IsTeacherRole(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            user
+            and user.is_authenticated
+            and getattr(user, "role", None) == "teacher"
+        )
+
+
+class IsDepartmentHeadRole(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return (
+            user
+            and user.is_authenticated
+            and getattr(user, "role", None) in {"department_head", "admin"}
         )
 
 
@@ -34,4 +81,4 @@ class IsAdminOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
-        return request.user.is_staff or getattr(request.user, "role", None) == "admin"
+        return request.user.is_staff or getattr(request.user, "role", None) in ADMIN_ROLES

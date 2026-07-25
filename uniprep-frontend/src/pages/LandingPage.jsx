@@ -15,6 +15,90 @@ import {
 } from "lucide-react";
 import heroImage from "../assets/hero.png";
 
+// ---- Content, separated from markup so it's easy to update or wire to real data ----
+
+const readiness = {
+  overall: 76,
+  trend: "Up 9% after three focused mock exams",
+  domains: [
+    { label: "Data Structures", value: 82, tone: "blue" },
+    { label: "Operating Systems", value: 68, tone: "green" },
+    { label: "Computer Networks", value: 54, tone: "amber" },
+    { label: "Database Systems", value: 73, tone: "blue" },
+  ],
+  nextMove: "Review subnetting and deadlocks, then take a 25-question adaptive mock exam.",
+};
+
+const studentFeatures = [
+  {
+    icon: UploadCloud,
+    title: "Upload your study PDFs",
+    text: "Turn lecture notes and modules into searchable chunks, summaries, flashcards, and quizzes.",
+  },
+  {
+    icon: BookOpenCheck,
+    title: "Practice like the real exam",
+    text: "Take timed mock exams from an admin-reviewed question bank mapped by course, domain, and topic.",
+  },
+  {
+    icon: Gauge,
+    title: "Know your readiness",
+    text: "See weak topics, topic accuracy, recent performance, focus time, and readiness by course.",
+  },
+];
+
+const studentFlow = [
+  {
+    icon: LibraryBig,
+    title: "Build a study library",
+    text: "Upload PDFs, classify by course or topic, and process them for AI study.",
+  },
+  {
+    icon: Sparkles,
+    title: "Generate study assets",
+    text: "Create summaries, flashcards, and quiz questions from uploaded material.",
+  },
+  {
+    icon: Clock3,
+    title: "Practice under pressure",
+    text: "Use timed mock exams and Pomodoro focus tracking to simulate real preparation.",
+  },
+  {
+    icon: BarChart3,
+    title: "Review what matters",
+    text: "Use analytics to revisit weak domains and grow readiness over time.",
+  },
+];
+
+const adminCapabilities = [
+  {
+    icon: FileSearch,
+    title: "PDF import pipeline",
+    text: "Extract questions from mock and past exam documents.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Approval workflow",
+    text: "Keep draft, rejected, and approved questions separate.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Course taxonomy",
+    text: "Manage courses, domains, topics, and weights.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Blueprint rules",
+    text: "Generate exams with controlled domain distribution.",
+  },
+];
+
+const proof = [
+  { value: "PDF", label: "study material upload" },
+  { value: "AI", label: "summaries and quizzes" },
+  { value: "100%", label: "readiness tracking" },
+];
+
 const LandingPage = () => {
   return (
     <main className="landing-page pro-landing">
@@ -49,50 +133,52 @@ const LandingPage = () => {
               </div>
 
               <div className="landing-proof">
-                <ProofItem value="PDF" label="study material upload" />
-                <ProofItem value="AI" label="summaries and quizzes" />
-                <ProofItem value="100%" label="readiness tracking" />
+                {proof.map((item) => (
+                  <ProofItem key={item.value} {...item} />
+                ))}
               </div>
             </div>
 
             <div className="col-lg-6">
-              <div className="exam-command-center">
+              <div className="exam-command-center" aria-label="Sample readiness dashboard">
                 <div className="command-header">
                   <div>
                     <p className="command-eyebrow mb-1">Readiness snapshot</p>
                     <h2 className="mb-0">BSc Exit Exam Readiness</h2>
                   </div>
 
-                  <span className="live-pill">Live</span>
+                  <span className="live-pill">
+                    <span className="visually-hidden">Status: </span>Live
+                  </span>
                 </div>
 
                 <div className="readiness-panel">
                   <div>
                     <span className="panel-label">Overall readiness</span>
-                    <strong>76%</strong>
-                    <p>Up 9% after three focused mock exams</p>
+                    <strong>{readiness.overall}%</strong>
+                    <p>{readiness.trend}</p>
                   </div>
 
-                  <div className="readiness-ring">
-                    <span>76</span>
+                  <div
+                    className="readiness-ring"
+                    role="img"
+                    aria-label={`Overall readiness ${readiness.overall} percent`}
+                  >
+                    <span aria-hidden="true">{readiness.overall}</span>
                   </div>
                 </div>
 
                 <div className="domain-bars">
-                  <DomainBar label="Data Structures" value={82} tone="blue" />
-                  <DomainBar label="Operating Systems" value={68} tone="green" />
-                  <DomainBar label="Computer Networks" value={54} tone="amber" />
-                  <DomainBar label="Database Systems" value={73} tone="blue" />
+                  {readiness.domains.map((domain) => (
+                    <DomainBar key={domain.label} {...domain} />
+                  ))}
                 </div>
 
                 <div className="next-action">
-                  <Brain size={20} />
+                  <Brain size={20} aria-hidden="true" />
                   <div>
                     <strong>Next best move</strong>
-                    <p>
-                      Review subnetting and deadlocks, then take a 25-question
-                      adaptive mock exam.
-                    </p>
+                    <p>{readiness.nextMove}</p>
                   </div>
                 </div>
               </div>
@@ -105,29 +191,18 @@ const LandingPage = () => {
         <div className="container">
           <div className="section-heading">
             <span className="landing-kicker light">What makes it different</span>
-            <h2>One platform for studying, testing, and improving.</h2>
+            <h2>Study material and exam practice, in one loop.</h2>
             <p>
-              UniPrep connects personal study material with official-style exam
-              practice, so preparation feels organized instead of scattered.
+              UniPrep connects your own notes with official-style exam
+              practice, so every study session points back to a measurable
+              readiness score.
             </p>
           </div>
 
           <div className="row g-4">
-            <LandingFeature
-              icon={UploadCloud}
-              title="Upload your study PDFs"
-              text="Turn lecture notes and modules into searchable chunks, summaries, flashcards, and quizzes."
-            />
-            <LandingFeature
-              icon={BookOpenCheck}
-              title="Practice like the real exam"
-              text="Take timed mock exams from an admin-reviewed question bank mapped by course, domain, and topic."
-            />
-            <LandingFeature
-              icon={Gauge}
-              title="Know your readiness"
-              text="See weak topics, topic accuracy, recent performance, focus time, and readiness by course."
-            />
+            {studentFeatures.map((feature) => (
+              <LandingFeature key={feature.title} {...feature} />
+            ))}
           </div>
         </div>
       </section>
@@ -139,34 +214,17 @@ const LandingPage = () => {
               <span className="landing-kicker light">For students</span>
               <h2 className="flow-title">A calm path from notes to exam confidence.</h2>
               <p className="flow-copy">
-                Students do not just answer questions. They build a weekly study
-                rhythm, measure improvement, and get targeted AI support from
-                their own materials.
+                Students do not just answer questions. They build a weekly
+                study rhythm, measure improvement, and get targeted AI support
+                from their own materials.
               </p>
             </div>
 
             <div className="col-lg-7">
               <div className="student-flow">
-                <FlowStep
-                  icon={LibraryBig}
-                  title="Build a study library"
-                  text="Upload PDFs, classify by course or topic, and process them for AI study."
-                />
-                <FlowStep
-                  icon={Sparkles}
-                  title="Generate study assets"
-                  text="Create summaries, flashcards, and quiz questions from uploaded material."
-                />
-                <FlowStep
-                  icon={Clock3}
-                  title="Practice under pressure"
-                  text="Use timed mock exams and Pomodoro focus tracking to simulate real preparation."
-                />
-                <FlowStep
-                  icon={BarChart3}
-                  title="Review what matters"
-                  text="Use analytics to revisit weak domains and grow readiness over time."
-                />
+                {studentFlow.map((step) => (
+                  <FlowStep key={step.title} {...step} />
+                ))}
               </div>
             </div>
           </div>
@@ -190,26 +248,9 @@ const LandingPage = () => {
 
             <div className="col-lg-7">
               <div className="admin-grid">
-                <AdminCapability
-                  icon={FileSearch}
-                  title="PDF import pipeline"
-                  text="Extract questions from mock and past exam documents."
-                />
-                <AdminCapability
-                  icon={ShieldCheck}
-                  title="Approval workflow"
-                  text="Keep draft, rejected, and approved questions separate."
-                />
-                <AdminCapability
-                  icon={GraduationCap}
-                  title="Course taxonomy"
-                  text="Manage courses, domains, topics, and weights."
-                />
-                <AdminCapability
-                  icon={CheckCircle2}
-                  title="Blueprint rules"
-                  text="Generate exams with controlled domain distribution."
-                />
+                {adminCapabilities.map((capability) => (
+                  <AdminCapability key={capability.title} {...capability} />
+                ))}
               </div>
             </div>
           </div>
@@ -256,7 +297,14 @@ const DomainBar = ({ label, value, tone }) => (
       <span>{label}</span>
       <strong>{value}%</strong>
     </div>
-    <div className="domain-track">
+    <div
+      className="domain-track"
+      role="progressbar"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`${label} readiness`}
+    >
       <div className={`domain-fill ${tone}`} style={{ width: `${value}%` }} />
     </div>
   </div>
@@ -266,7 +314,7 @@ const LandingFeature = ({ icon: Icon, title, text }) => (
   <div className="col-md-4">
     <article className="landing-feature h-100">
       <div className="landing-feature-icon">
-        <Icon size={24} />
+        <Icon size={24} aria-hidden="true" />
       </div>
       <h3>{title}</h3>
       <p>{text}</p>
@@ -277,7 +325,7 @@ const LandingFeature = ({ icon: Icon, title, text }) => (
 const FlowStep = ({ icon: Icon, title, text }) => (
   <article className="flow-step">
     <div className="flow-icon">
-      <Icon size={22} />
+      <Icon size={22} aria-hidden="true" />
     </div>
     <div>
       <h3>{title}</h3>
@@ -288,7 +336,7 @@ const FlowStep = ({ icon: Icon, title, text }) => (
 
 const AdminCapability = ({ icon: Icon, title, text }) => (
   <article className="admin-capability">
-    <Icon size={24} />
+    <Icon size={24} aria-hidden="true" />
     <h3>{title}</h3>
     <p>{text}</p>
   </article>

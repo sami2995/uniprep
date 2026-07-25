@@ -4,6 +4,11 @@ from exit_exams.models import Question, Topic, Domain, Course
 
 
 class StudentTopicPerformance(models.Model):
+    class Trend(models.TextChoices):
+        IMPROVING = "improving", "Improving"
+        DECLINING = "declining", "Declining"
+        STABLE = "stable", "Stable"
+
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -21,7 +26,14 @@ class StudentTopicPerformance(models.Model):
     )
 
     correct_attempts = models.PositiveIntegerField(default=0)
+    wrong_attempts = models.PositiveIntegerField(default=0)
     total_attempts = models.PositiveIntegerField(default=0)
+    average_time_seconds = models.PositiveIntegerField(default=0)
+    trend = models.CharField(
+        max_length=20,
+        choices=Trend.choices,
+        default=Trend.STABLE
+    )
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -39,6 +51,41 @@ class StudentTopicPerformance(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.topic.name}: {self.accuracy}%"
+
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        MOCK_AVAILABLE = "mock_available", "Mock Available"
+        WEAK_TOPIC = "weak_topic", "Weak Topic"
+        BATTLE_INVITE = "battle_invite", "Battle Invite"
+        MATERIAL_UPLOADED = "material_uploaded", "Material Uploaded"
+        WEEKLY_REMINDER = "weekly_reminder", "Weekly Reminder"
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+    title = models.CharField(max_length=150)
+    message = models.TextField()
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NotificationType.choices
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["student", "is_read"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.title}"
+
+
 class SpacedRepetitionQueue(models.Model):
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,

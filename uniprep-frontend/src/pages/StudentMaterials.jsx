@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
+import { ROLES, normalizeRole } from "../routes/roleRoutes";
 
 const StudentMaterials = () => {
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const materialBasePath =
+    role === ROLES.TEACHER ? "/teacher/materials" : "/student/materials";
+
   const [materials, setMaterials] = useState([]);
   const [courses, setCourses] = useState([]);
   const [domains, setDomains] = useState([]);
@@ -284,7 +291,7 @@ const StudentMaterials = () => {
 
                           <Link
                             className="btn btn-sm btn-primary"
-                            to={`/student/materials/${material.id}`}
+                            to={`${materialBasePath}/${material.id}`}
                           >
                             Open
                           </Link>

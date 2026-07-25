@@ -46,6 +46,11 @@ from .services.ai_service import (
     generate_flashcards_ai,
     generate_quiz_ai,
 )
+
+
+ADMIN_ROLES = {"department_head", "system_admin", "admin"}
+
+
 def create_fallback_flashcards_from_chunks(chunks, count=5):
     flashcards = []
 
@@ -100,7 +105,7 @@ class StudyMaterialViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return StudyMaterial.objects.all()
 
         return StudyMaterial.objects.filter(owner=user)
@@ -116,7 +121,7 @@ class DocumentChunkViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return DocumentChunk.objects.all()
 
         return DocumentChunk.objects.filter(material__owner=user)
@@ -129,7 +134,7 @@ class AIChatSessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return AIChatSession.objects.all()
 
         return AIChatSession.objects.filter(student=user)
@@ -145,7 +150,7 @@ class AIChatMessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return AIChatMessage.objects.all()
 
         return AIChatMessage.objects.filter(session__student=user)
@@ -158,7 +163,7 @@ class MaterialSummaryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return MaterialSummary.objects.all()
 
         return MaterialSummary.objects.filter(material__owner=user)
@@ -171,7 +176,7 @@ class GeneratedFlashcardViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return GeneratedFlashcard.objects.all()
 
         return GeneratedFlashcard.objects.filter(student=user)
@@ -187,7 +192,7 @@ class GeneratedQuizViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return GeneratedQuiz.objects.all()
 
         return GeneratedQuiz.objects.filter(student=user)
@@ -203,7 +208,7 @@ class GeneratedQuizQuestionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             return GeneratedQuizQuestion.objects.all()
 
         return GeneratedQuizQuestion.objects.filter(quiz__student=user)
@@ -215,7 +220,7 @@ def process_study_material(request, material_id):
     user = request.user
 
     try:
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             material = StudyMaterial.objects.get(id=material_id)
         else:
             material = StudyMaterial.objects.get(id=material_id, owner=user)
@@ -335,7 +340,7 @@ def generate_material_summary(request, material_id):
     user = request.user
 
     try:
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             material = StudyMaterial.objects.get(id=material_id)
         else:
             material = StudyMaterial.objects.get(id=material_id, owner=user)
@@ -413,7 +418,7 @@ def ask_material_question(request, material_id):
         )
 
     try:
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             material = StudyMaterial.objects.get(id=material_id)
         else:
             material = StudyMaterial.objects.get(id=material_id, owner=user)
@@ -546,7 +551,7 @@ def generate_material_flashcards(request, material_id):
     user = request.user
 
     try:
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             material = StudyMaterial.objects.get(id=material_id)
         else:
             material = StudyMaterial.objects.get(id=material_id, owner=user)
@@ -641,7 +646,7 @@ def generate_material_quiz(request, material_id):
     user = request.user
 
     try:
-        if user.role == "admin" or user.is_staff:
+        if user.is_staff or user.role in ADMIN_ROLES:
             material = StudyMaterial.objects.get(id=material_id)
         else:
             material = StudyMaterial.objects.get(id=material_id, owner=user)

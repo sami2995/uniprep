@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { getDefaultPathForRole } from "../routes/roleRoutes";
 
 const Login = () => {
   const { login } = useAuth();
@@ -29,11 +30,7 @@ const Login = () => {
     try {
       const user = await login(form.username, form.password);
 
-      if (user.role === "admin") {
-        navigate("/admin/dashboard");
-      } else {
-        navigate("/student/dashboard");
-      }
+      navigate(getDefaultPathForRole(user.role));
     } catch (err) {
       setError("Invalid username or password.");
     } finally {

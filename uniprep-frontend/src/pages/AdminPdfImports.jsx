@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
+import { ROLES, normalizeRole } from "../routes/roleRoutes";
 
 const getRelationId = (value) => {
   if (value === null || value === undefined || value === "") return "";
@@ -7,7 +10,24 @@ const getRelationId = (value) => {
   return value;
 };
 
+const PROCESS_STEPS = [
+  "Uploading...",
+  "Processing PDF...",
+  "Extracting Questions...",
+  "Assigning Course...",
+  "Assigning Domain...",
+  "Assigning Topic...",
+  "Checking Duplicates...",
+  "Ready for Review",
+];
+
 const AdminPdfImports = () => {
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const isTeacher = role === ROLES.TEACHER;
+  const isDepartmentHead = role === ROLES.DEPARTMENT_HEAD;
+
   const [imports, setImports] = useState([]);
   const [extractedQuestions, setExtractedQuestions] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -17,7 +37,9 @@ const AdminPdfImports = () => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [skippedReasons, setSkippedReasons] = useState([]);
 
-  const [statusFilter, setStatusFilter] = useState("draft");
+  const [statusFilter, setStatusFilter] = useState(
+    searchParams.get("filter") || (isTeacher ? "draft" : "submitted")
+  );
   const [searchTerm, setSearchTerm] = useState("");
 
   const [form, setForm] = useState({
@@ -42,6 +64,8 @@ const AdminPdfImports = () => {
   const [uploading, setUploading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [classifyingId, setClassifyingId] = useState(null);
+  const [progressStep, setProgressStep] = useState(-1);
+  const [duplicateModal, setDuplicateModal] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -98,6 +122,7 @@ const AdminPdfImports = () => {
     return {
       all: extractedQuestions.length,
       draft: extractedQuestions.filter((q) => q.status === "draft").length,
+      submitted: extractedQuestions.filter((q) => q.status === "submitted").length,
       approved: extractedQuestions.filter((q) => q.status === "approved").length,
       rejected: extractedQuestions.filter((q) => q.status === "rejected").length,
     };
@@ -133,6 +158,10 @@ const AdminPdfImports = () => {
   const draftQuestions = extractedQuestions.filter(
     (item) => item.status === "draft"
   );
+  const progressPercent =
+    progressStep < 0
+      ? 0
+      : Math.round(((progressStep + 1) / PROCESS_STEPS.length) * 100);
 
   const handleUploadChange = (e) => {
     const { name, value, files } = e.target;
@@ -155,6 +184,7 @@ const AdminPdfImports = () => {
     }
 
     setUploading(true);
+    setProgressStep(0);
 
     try {
       const data = new FormData();
@@ -171,6 +201,7 @@ const AdminPdfImports = () => {
         },
       });
 
+      setProgressStep(1);
       setSuccess("PDF uploaded successfully.");
 
       setForm({
@@ -184,6 +215,7 @@ const AdminPdfImports = () => {
       setError(err.response?.data?.detail || "PDF upload failed.");
     } finally {
       setUploading(false);
+      setTimeout(() => setProgressStep(-1), 1200);
     }
   };
 
@@ -192,17 +224,21 @@ const AdminPdfImports = () => {
     setSuccess("");
     setSkippedReasons([]);
     setProcessingId(importId);
+    setProgressStep(1);
 
     try {
+      setProgressStep(2);
       const response = await api.post(
         `/exit-exams/exam-pdf-imports/${importId}/process/`
       );
 
+      setProgressStep(3);
       setSuccess(
         `PDF processed successfully. Detected ${response.data.detected_questions} questions.`
       );
 
       setStatusFilter("draft");
+      setProgressStep(7);
       await fetchData();
     } catch (err) {
       setError(
@@ -212,6 +248,7 @@ const AdminPdfImports = () => {
       );
     } finally {
       setProcessingId(null);
+      setTimeout(() => setProgressStep(-1), 1200);
     }
   };
 
@@ -220,8 +257,10 @@ const AdminPdfImports = () => {
     setSuccess("");
     setSkippedReasons([]);
     setClassifyingId(importId);
+    setProgressStep(4);
 
     try {
+      setProgressStep(5);
       const response = await api.post(
         "/exit-exams/extracted-questions/auto-classify/",
         { import_id: importId }
@@ -233,6 +272,7 @@ const AdminPdfImports = () => {
       );
 
       setStatusFilter("draft");
+      setProgressStep(7);
       await fetchData();
     } catch (err) {
       setError(
@@ -242,6 +282,7 @@ const AdminPdfImports = () => {
       );
     } finally {
       setClassifyingId(null);
+      setTimeout(() => setProgressStep(-1), 1200);
     }
   };
 
@@ -255,28 +296,40 @@ const AdminPdfImports = () => {
     });
   };
 
+  const buildExtractedQuestionPayload = (id) => {
+    const payload = editing[id];
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      question_text: payload.question_text,
+      option_a: payload.option_a,
+      option_b: payload.option_b,
+      option_c: payload.option_c,
+      option_d: payload.option_d,
+      domain: payload.domain ? Number(payload.domain) : null,
+      topic: payload.topic ? Number(payload.topic) : null,
+      correct_answer: payload.correct_answer,
+      difficulty: payload.difficulty,
+      bloom_level: payload.bloom_level,
+      explanation: payload.explanation,
+    };
+  };
+
+  const saveExtractedQuestionChanges = async (id) => {
+    const payload = buildExtractedQuestionPayload(id);
+    if (!payload) return;
+    await api.patch(`/exit-exams/extracted-questions/${id}/`, payload);
+  };
+
   const saveExtractedQuestion = async (id) => {
     setError("");
     setSuccess("");
     setSkippedReasons([]);
 
     try {
-      const payload = editing[id];
-
-      await api.patch(`/exit-exams/extracted-questions/${id}/`, {
-        question_text: payload.question_text,
-        option_a: payload.option_a,
-        option_b: payload.option_b,
-        option_c: payload.option_c,
-        option_d: payload.option_d,
-        domain: payload.domain ? Number(payload.domain) : null,
-        topic: payload.topic ? Number(payload.topic) : null,
-        correct_answer: payload.correct_answer,
-        difficulty: payload.difficulty,
-        bloom_level: payload.bloom_level,
-        explanation: payload.explanation,
-      });
-
+      await saveExtractedQuestionChanges(id);
       setSuccess("Extracted question updated successfully.");
       await fetchData();
     } catch (err) {
@@ -290,7 +343,7 @@ const AdminPdfImports = () => {
     setSkippedReasons([]);
 
     try {
-      await saveExtractedQuestion(id);
+      await saveExtractedQuestionChanges(id);
       await api.post(`/exit-exams/extracted-questions/${id}/approve/`);
 
       setSuccess("Question approved and added to question bank.");
@@ -309,11 +362,115 @@ const AdminPdfImports = () => {
     setSkippedReasons([]);
 
     try {
+      await saveExtractedQuestionChanges(id);
       await api.post(`/exit-exams/extracted-questions/${id}/reject/`);
       setSuccess("Question rejected.");
       await fetchData();
     } catch (err) {
       setError(err.response?.data?.detail || "Reject failed.");
+    }
+  };
+
+  const findDuplicateWarnings = async (ids) => {
+    const selected = extractedQuestions.filter((item) => ids.includes(item.id));
+    const warnings = [];
+
+    for (const item of selected) {
+      const draft = editing[item.id] || item;
+
+      try {
+        const response = await api.post("/exit-exams/questions/check-duplicate/", {
+          text: draft.question_text,
+          course_id: item.course || form.course || null,
+          threshold: 0.85,
+        });
+
+        if (response.data.has_duplicates) {
+          warnings.push({
+            extracted: item,
+            duplicates: response.data.duplicates,
+          });
+        }
+      } catch {
+        /* Duplicate checks should warn, not block import review. */
+      }
+    }
+
+    return warnings;
+  };
+
+  const submitSelectedForApproval = async ({
+    skipDuplicates = false,
+    ignoreDuplicates = false,
+    idsOverride = null,
+  } = {}) => {
+    setError("");
+    setSuccess("");
+    setSkippedReasons([]);
+
+    const ids = idsOverride || selectedIds;
+
+    if (ids.length === 0) {
+      setError("Please select at least one draft or rejected question.");
+      return;
+    }
+
+    setProgressStep(6);
+
+    try {
+      const warnings = await findDuplicateWarnings(ids);
+
+      if (warnings.length > 0 && !skipDuplicates && !ignoreDuplicates) {
+        setDuplicateModal({ warnings, ids });
+        return;
+      }
+
+      const duplicateIds = new Set(
+        warnings.map((warning) => warning.extracted.id)
+      );
+      const idsToSubmit = skipDuplicates
+        ? ids.filter((id) => !duplicateIds.has(id))
+        : ids;
+
+      if (idsToSubmit.length === 0) {
+        setError("All selected questions were skipped because duplicates exist.");
+        return;
+      }
+
+      const response = await api.post("/exit-exams/extracted-questions/submit/", {
+        ids: idsToSubmit,
+      });
+
+      setSuccess(
+        `Submitted ${response.data.submitted_count} question(s) for approval. ` +
+          `Skipped: ${response.data.skipped_count}.`
+      );
+      setSkippedReasons(response.data.skipped || []);
+      setSelectedIds([]);
+      setDuplicateModal(null);
+      setStatusFilter("submitted");
+      setProgressStep(7);
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Submit for approval failed.");
+    } finally {
+      setTimeout(() => setProgressStep(-1), 1200);
+    }
+  };
+
+  const deleteExtractedQuestion = async (id) => {
+    if (!window.confirm("Delete this extracted question?")) return;
+
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.delete(`/exit-exams/extracted-questions/${id}/`);
+      setSelectedIds(selectedIds.filter((item) => item !== id));
+      setSuccess("Extracted question deleted.");
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Delete failed.");
     }
   };
 
@@ -327,14 +484,24 @@ const AdminPdfImports = () => {
 
   const selectAllVisibleDrafts = () => {
     const ids = filteredQuestions
-      .filter((item) => item.status === "draft")
+      .filter((item) =>
+        isTeacher
+          ? item.status === "draft" || item.status === "rejected"
+          : item.status === "draft"
+      )
       .map((item) => item.id);
 
     setSelectedIds(ids);
   };
 
   const selectAllDrafts = () => {
-    const ids = draftQuestions.map((item) => item.id);
+    const ids = extractedQuestions
+      .filter((item) =>
+        isTeacher
+          ? item.status === "draft" || item.status === "rejected"
+          : item.status === "draft"
+      )
+      .map((item) => item.id);
     setSelectedIds(ids);
   };
 
@@ -375,7 +542,7 @@ const AdminPdfImports = () => {
     setSkippedReasons([]);
 
     if (selectedIds.length === 0) {
-      setError("Please select at least one draft question.");
+      setError("Please select at least one submitted question.");
       return;
     }
 
@@ -408,6 +575,7 @@ const AdminPdfImports = () => {
   const statusBadge = (status) => {
     if (status === "approved") return "bg-success";
     if (status === "rejected") return "bg-danger";
+    if (status === "submitted") return "bg-warning text-dark";
     if (status === "needs_review") return "bg-warning text-dark";
     if (status === "failed") return "bg-danger";
     return "bg-secondary";
@@ -426,14 +594,59 @@ const AdminPdfImports = () => {
 
   return (
     <div className="container-fluid py-4">
-      <h2 className="fw-bold mb-2">PDF Import & Question Review</h2>
+      <h2 className="fw-bold mb-2">
+        {isTeacher
+          ? "Import Previous Exit Exam"
+          : "PDF Import & Question Review"}
+      </h2>
       <p className="text-muted">
-        Upload mock/Exit Exam PDFs, extract MCQs, review them, and approve valid
-        questions into the official question bank.
+        {isTeacher
+          ? "Upload previous exit exam PDFs for assigned courses, review extracted questions, and submit them for department head approval."
+          : "Upload mock/Exit Exam PDFs, extract MCQs, review them, and approve valid questions into the official question bank."}
       </p>
 
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
+
+      {progressStep >= 0 && (
+        <div className="card border-0 shadow-sm rounded-4 mb-4">
+          <div className="card-body p-3">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <strong>{PROCESS_STEPS[progressStep]}</strong>
+              <span className="text-muted small">{progressPercent}%</span>
+            </div>
+            <div className="progress" style={{ height: "8px" }}>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                style={{ width: `${progressPercent}%` }}
+                aria-valuenow={progressPercent}
+                aria-valuemin="0"
+                aria-valuemax="100"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicateModal && (
+        <DuplicateWarningModal
+          warnings={duplicateModal.warnings}
+          onSkip={() =>
+            submitSelectedForApproval({
+              skipDuplicates: true,
+              idsOverride: duplicateModal.ids,
+            })
+          }
+          onImportAnyway={() =>
+            submitSelectedForApproval({
+              ignoreDuplicates: true,
+              idsOverride: duplicateModal.ids,
+            })
+          }
+          onClose={() => setDuplicateModal(null)}
+        />
+      )}
 
       {skippedReasons.length > 0 && (
         <div className="alert alert-warning">
@@ -517,16 +730,19 @@ const AdminPdfImports = () => {
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label">PDF File</label>
-                  <input
-                    type="file"
-                    name="file"
-                    className="form-control"
-                    accept=".pdf"
-                    onChange={handleUploadChange}
-                    required
-                  />
-                </div>
+                    <label className="form-label">Upload File</label>
+                    <input
+                      type="file"
+                      name="file"
+                      className="form-control"
+                      accept=".pdf,.docx"
+                      onChange={handleUploadChange}
+                      required
+                    />
+                    <small className="form-text text-muted">
+                      PDF is preferred; DOCX is also supported if available.
+                    </small>
+                  </div>
 
                 <button className="btn btn-primary w-100" disabled={uploading}>
                   {uploading ? "Uploading..." : "Upload PDF"}
@@ -631,6 +847,9 @@ const AdminPdfImports = () => {
                     }}
                   >
                     <option value="draft">Draft ({counts.draft})</option>
+                    <option value="submitted">
+                      Pending Approval ({counts.submitted})
+                    </option>
                     <option value="approved">Approved ({counts.approved})</option>
                     <option value="rejected">Rejected ({counts.rejected})</option>
                     <option value="all">All ({counts.all})</option>
@@ -645,6 +864,9 @@ const AdminPdfImports = () => {
                 </span>
                 <span className="badge bg-success">
                   Approved: {counts.approved}
+                </span>
+                <span className="badge bg-warning text-dark">
+                  Pending: {counts.submitted}
                 </span>
                 <span className="badge bg-danger">
                   Rejected: {counts.rejected}
@@ -762,12 +984,21 @@ const AdminPdfImports = () => {
                     Apply Domain/Topic
                   </button>
 
-                  <button
-                    className="btn btn-sm btn-success"
-                    onClick={bulkApproveSelected}
-                  >
-                    Bulk Approve Selected
-                  </button>
+                  {isTeacher ? (
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => submitSelectedForApproval()}
+                    >
+                      Submit Selected for Approval
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={bulkApproveSelected}
+                    >
+                      Bulk Approve Selected
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -781,7 +1012,9 @@ const AdminPdfImports = () => {
                     <div key={item.id} className="extracted-question-card">
                       <div className="d-flex justify-content-between mb-2">
                         <div className="d-flex align-items-center gap-2">
-                          {item.status === "draft" && (
+                          {((isTeacher &&
+                            (item.status === "draft" || item.status === "rejected")) ||
+                            (!isTeacher && item.status === "submitted")) && (
                             <input
                               type="checkbox"
                               className="form-check-input"
@@ -800,7 +1033,9 @@ const AdminPdfImports = () => {
                         </span>
                       </div>
 
-                      {item.status === "draft" ? (
+                      {item.status === "draft" ||
+                      (isTeacher && item.status === "rejected") ||
+                      (isDepartmentHead && item.status === "submitted") ? (
                         <>
                           <div className="mb-2">
                             <label className="form-label small">
@@ -1014,22 +1249,45 @@ const AdminPdfImports = () => {
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => saveExtractedQuestion(item.id)}
                             >
-                              Save
+                              {isTeacher ? "Save Draft" : "Save"}
                             </button>
 
-                            <button
-                              className="btn btn-sm btn-success"
-                              onClick={() => approveQuestion(item.id)}
-                            >
-                              Approve
-                            </button>
+                            {isTeacher ? (
+                              <>
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() =>
+                                    submitSelectedForApproval({
+                                      idsOverride: [item.id],
+                                    })
+                                  }
+                                >
+                                  Submit
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => deleteExtractedQuestion(item.id)}
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() => approveQuestion(item.id)}
+                                >
+                                  Approve
+                                </button>
 
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => rejectQuestion(item.id)}
-                            >
-                              Reject
-                            </button>
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => rejectQuestion(item.id)}
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -1060,5 +1318,65 @@ const AdminPdfImports = () => {
     </div>
   );
 };
+
+const DuplicateWarningModal = ({
+  warnings,
+  onSkip,
+  onImportAnyway,
+  onClose,
+}) => (
+  <div
+    className="modal show d-block"
+    style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+    tabIndex="-1"
+  >
+    <div className="modal-dialog modal-lg modal-dialog-centered">
+      <div className="modal-content border-0 shadow rounded-4">
+        <div className="modal-header border-0 pb-0">
+          <h5 className="modal-title fw-bold">Possible Duplicate Questions</h5>
+          <button className="btn-close" onClick={onClose} />
+        </div>
+        <div className="modal-body pt-2">
+          <p className="text-muted">
+            One or more selected extracted questions already match existing
+            question-bank content.
+          </p>
+          <div className="d-grid gap-3">
+            {warnings.map((warning) => (
+              <div
+                key={warning.extracted.id}
+                className="alert alert-warning mb-0 rounded-3"
+              >
+                <p className="fw-semibold mb-2 small">
+                  Q{warning.extracted.question_number}:{" "}
+                  {warning.extracted.question_text}
+                </p>
+                {warning.duplicates.map((duplicate) => (
+                  <div
+                    key={duplicate.question_id}
+                    className="small text-muted mb-1"
+                  >
+                    {duplicate.similarity}% match: {duplicate.text}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="modal-footer border-0 pt-0">
+          <button className="btn btn-outline-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-outline-warning" onClick={onSkip}>
+            Skip Duplicates
+          </button>
+          <button className="btn btn-warning" onClick={onImportAnyway}>
+            Import Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default AdminPdfImports;

@@ -5,20 +5,47 @@ from django.db import models
 class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         STUDENT = "student", "Student"
-        ADMIN = "admin", "Admin"
+        TEACHER = "teacher", "Teacher"
+        DEPARTMENT_HEAD = "department_head", "Department Head"
+        SYSTEM_ADMIN = "system_admin", "System Admin"
 
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
         default=Role.STUDENT
     )
+    department = models.ForeignKey(
+        "exit_exams.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users"
+    )
     email = models.EmailField(unique=True)
 
     def is_student(self):
         return self.role == self.Role.STUDENT
 
+    def is_teacher(self):
+        return self.role == self.Role.TEACHER
+
+    def is_department_head(self):
+        return self.role == self.Role.DEPARTMENT_HEAD
+
+    def is_system_admin(self):
+        return self.role == self.Role.SYSTEM_ADMIN
+
     def is_admin_user(self):
-        return self.role == self.Role.ADMIN
+        return (
+            self.is_staff
+            or self.role in {
+                self.Role.DEPARTMENT_HEAD,
+                self.Role.SYSTEM_ADMIN,
+                "admin",
+            }
+        )
+
+
 class StudentProfile(models.Model):
     user = models.OneToOneField(
         CustomUser,

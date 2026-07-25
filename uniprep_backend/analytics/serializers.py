@@ -3,7 +3,8 @@ from .models import (
     StudentTopicPerformance,
     SpacedRepetitionQueue,
     ReadinessScore,
-    FocusSession
+    FocusSession,
+    Notification
 )
 
 
@@ -30,3 +31,18 @@ class FocusSessionSerializer(serializers.ModelSerializer):
         model = FocusSession
         fields = "__all__"
         read_only_fields = ["student", "started_at", "ended_at", "duration_minutes"]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "student",
+            "title",
+            "message",
+            "notification_type",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = ["student", "created_at"]

@@ -18,6 +18,7 @@ const TakeExam = () => {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const questions = useMemo(() => {
     return mockExam?.mock_questions || [];
@@ -38,7 +39,7 @@ const TakeExam = () => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          submitExam(true);
+          executeSubmit(true);
           return 0;
         }
 
@@ -134,16 +135,27 @@ const TakeExam = () => {
     }
   };
 
-  const submitExam = async (autoSubmit = false) => {
-    if (!autoSubmit) {
-      let message = "Are you sure you want to submit?";
+  const handlePrepareSubmit = () => {
+    if (unansweredCount > 0) {
+      setShowSubmitModal(true);
+    } else {
+      executeSubmit(false);
+    }
+  };
 
-      if (unansweredCount > 0) {
-        message = `You still have ${unansweredCount} unanswered question(s). Submit anyway?`;
-      }
+  const handleReviewUnanswered = () => {
+    setShowSubmitModal(false);
+    const firstUnansweredIndex = questions.findIndex(
+      (item) => !answers[item.question.id]
+    );
+    if (firstUnansweredIndex !== -1) {
+      setCurrentIndex(firstUnansweredIndex);
+    }
+  };
 
-      const confirmed = window.confirm(message);
-      if (!confirmed) return;
+  const executeSubmit = async (isTimeExpired = false) => {
+    if (unansweredCount > 0 && !isTimeExpired) {
+      return;
     }
 
     setSubmitting(true);
@@ -208,7 +220,11 @@ const TakeExam = () => {
 
       <div className="row">
         <div className="col-lg-8">
-          <div className="card border-0 shadow-sm rounded-4">
+          <div
+            className={`card shadow-sm rounded-4 ${
+              !answers[currentQuestion.id] ? "unanswered-card" : "border-0"
+            }`}
+          >
             <div className="card-body p-4">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <span className="badge bg-primary">
@@ -218,7 +234,7 @@ const TakeExam = () => {
                 {answers[currentQuestion.id] ? (
                   <span className="badge bg-success">Answered</span>
                 ) : (
-                  <span className="badge bg-warning text-dark">
+                  <span className="badge bg-danger">
                     Not answered
                   </span>
                 )}
@@ -275,7 +291,7 @@ const TakeExam = () => {
                     <button
                       className="btn btn-success"
                       disabled={submitting}
-                      onClick={() => submitExam(false)}
+                      onClick={handlePrepareSubmit}
                     >
                       {submitting ? "Submitting..." : "Submit Exam"}
                     </button>
@@ -313,7 +329,7 @@ const TakeExam = () => {
                       key={item.id}
                       className={`question-number ${
                         isActive ? "active" : ""
-                      } ${isAnswered ? "answered" : ""}`}
+                      } ${isAnswered ? "answered" : "unanswered"}`}
                       onClick={() => setCurrentIndex(index)}
                     >
                       {index + 1}
@@ -325,7 +341,7 @@ const TakeExam = () => {
               <button
                 className="btn btn-success w-100 mt-4"
                 disabled={submitting}
-                onClick={() => submitExam(false)}
+                onClick={handlePrepareSubmit}
               >
                 Submit Exam
               </button>
@@ -339,6 +355,50 @@ const TakeExam = () => {
           </div>
         </div>
       </div>
+
+      {showSubmitModal && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-danger">
+                  Unanswered Questions
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowSubmitModal(false)}
+                />
+              </div>
+              <div className="modal-body py-3">
+                <p className="mb-0 fs-5">
+                  You have <strong>{unansweredCount}</strong> unanswered question{unansweredCount > 1 ? "s" : ""}.
+                </p>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={handleReviewUnanswered}
+                >
+                  Go to First Unanswered
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowSubmitModal(false)}
+                >
+                  Continue Exam
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -46,7 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=validated_data.get("username"),
             email=validated_data.get("email"),
             password=password,
-            role="student"
+            role=CustomUser.Role.STUDENT
         )
 
         StudentProfile.objects.create(
@@ -62,6 +62,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     student_profile = serializers.SerializerMethodField()
+    department_name = serializers.CharField(
+        source="department.name",
+        read_only=True
+    )
 
     class Meta:
         model = CustomUser
@@ -70,8 +74,11 @@ class UserSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "role",
+            "department",
+            "department_name",
             "student_profile",
         ]
+        read_only_fields = ["id", "role", "department", "department_name"]
 
     def get_student_profile(self, obj):
         if hasattr(obj, "student_profile"):
@@ -82,6 +89,28 @@ class UserSerializer(serializers.ModelSerializer):
                 "year_of_study": obj.student_profile.year_of_study,
             }
         return None
+
+    def to_internal_value(self, data):
+        student_profile_data = data.get("student_profile")
+        data = data.copy()
+        data.pop("student_profile", None)
+        values = super().to_internal_value(data)
+        if student_profile_data is not None:
+            values["student_profile"] = student_profile_data
+        return values
+
+    def update(self, instance, validated_data):
+        student_profile_data = validated_data.pop("student_profile", None)
+        instance = super().update(instance, validated_data)
+
+        if student_profile_data and hasattr(instance, "student_profile"):
+            student_profile = instance.student_profile
+            for field, value in student_profile_data.items():
+                if field in {"student_id", "department", "program", "year_of_study"}:
+                    setattr(student_profile, field, value)
+            student_profile.save()
+
+        return instance
 
 
 class StudentProfileSerializer(serializers.ModelSerializer):

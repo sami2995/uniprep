@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import api from "../api/api";
 
 import {
@@ -16,6 +25,22 @@ const RECENT_LIMIT = 5;
 const getArrayData = (data) => {
   if (Array.isArray(data)) return data;
   return data?.results || [];
+};
+
+const getWeakTopicsFromHierarchy = (data) => {
+  const courses = data?.courses || (data?.domains ? [data] : []);
+
+  return courses.flatMap((course) =>
+    (course.domains || []).flatMap((domain) =>
+      (domain.topics || [])
+        .filter((topic) => Number(topic.accuracy) < 60)
+        .map((topic) => ({
+          ...topic,
+          course: course.course,
+          domain: domain.name,
+        }))
+    )
+  );
 };
 
 const getNumberValue = (...values) => {
@@ -81,6 +106,10 @@ const getMaterialStatusBadge = (status) => {
 const StudentDashboard = () => {
   const [dashboard, setDashboard] = useState(null);
   const [focusSummary, setFocusSummary] = useState(null);
+  const [weakTopics, setWeakTopics] = useState([]);
+  const [weakDomains, setWeakDomains] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [trendData, setTrendData] = useState([]);
 
   const [recentResults, setRecentResults] = useState([]);
   const [recentMaterials, setRecentMaterials] = useState([]);
@@ -102,16 +131,23 @@ const StudentDashboard = () => {
       setLoading(true);
       setError("");
 
-      const [dashboardRes, resultsRes, materialsRes, focusRes] =
-        await Promise.all([
-          api.get("/analytics/dashboard/"),
-          api.get("/exit-exams/my-results/"),
-          api.get("/rag/materials/"),
-          api.get("/analytics/focus/summary/"),
-        ]);
-
+      // Fetch the core dashboard first (required). Other analytics/endpoints
+      // are non-blocking: use Promise.allSettled so a single failure won't
+      // prevent the page from rendering.
+      const dashboardRes = await api.get("/analytics/dashboard/");
       const dashboardData = dashboardRes.data;
-      const focusData = focusRes.data || {};
+
+      const settled = await Promise.allSettled([
+        api.get("/exit-exams/my-results/"),
+        api.get("/rag/materials/"),
+        api.get("/analytics/focus/summary/"),
+      ]);
+
+      const resultsRes = settled[0].status === "fulfilled" ? settled[0].value : { data: [] };
+      const materialsRes = settled[1].status === "fulfilled" ? settled[1].value : { data: [] };
+      const focusRes = settled[2].status === "fulfilled" ? settled[2].value : { data: dashboardData?.focus_summary || {} };
+
+      const focusData = (focusRes && focusRes.data) || {};
 
       setDashboard(dashboardData);
       setFocusSummary(focusData);
@@ -125,6 +161,40 @@ const StudentDashboard = () => {
       if (todayMinutes > 0) {
         const updatedStreak = markStudyActivity();
         setStreak(updatedStreak);
+      }
+
+      const [weaknessResult, recommendationsResult, trendResult] =
+        await Promise.allSettled([
+          api.get("/analytics/student/weakness/"),
+          api.get("/analytics/student/recommendations/"),
+          api.get("/analytics/student/trend/"),
+        ]);
+
+      if (weaknessResult.status === "fulfilled") {
+        const wData = weaknessResult.value.data;
+        setWeakTopics(getWeakTopicsFromHierarchy(wData));
+        setWeakDomains(wData.weak_domains || wData.domains || dashboardData?.weak_domains || []);
+      } else {
+        setWeakTopics(dashboardData?.weak_topics || []);
+        setWeakDomains(dashboardData?.weak_domains || []);
+        console.error("Failed to load weakness analytics:", weaknessResult.reason);
+      }
+
+      if (recommendationsResult.status === "fulfilled") {
+        setRecommendations(getArrayData(recommendationsResult.value.data));
+      } else {
+        setRecommendations([]);
+        console.error(
+          "Failed to load student recommendations:",
+          recommendationsResult.reason
+        );
+      }
+
+      if (trendResult.status === "fulfilled") {
+        setTrendData(getArrayData(trendResult.value.data));
+      } else {
+        setTrendData([]);
+        console.error("Failed to load trend analytics:", trendResult.reason);
       }
     } catch (err) {
       console.error(err);
@@ -304,14 +374,29 @@ const StudentDashboard = () => {
       </div>
 
       <div className="row g-3 mt-3">
-        <div className="col-md-6">
-          <WeakTopicsCard weakTopics={dashboard?.weak_topics || []} />
+        <div className="col-lg-5">
+          <AdvancedWeakTopicsCard
+            weakTopics={
+              weakTopics.length > 0 ? weakTopics : dashboard?.weak_topics || []
+            }
+            weakDomains={
+              weakDomains.length > 0 ? weakDomains : dashboard?.weak_domains || []
+            }
+          />
         </div>
 
-        <div className="col-md-6">
-          <SpacedRepetitionCard
-            dueItems={dashboard?.spaced_repetition_due || []}
-          />
+        <div className="col-lg-7">
+          <RecommendationsCard recommendations={recommendations} />
+        </div>
+      </div>
+
+      <div className="row g-3 mt-3">
+        <div className="col-lg-7">
+          <TrendChart trendData={trendData} />
+        </div>
+
+        <div className="col-lg-5">
+          <SpacedRepetitionCard dueItems={dashboard?.spaced_repetition_due || []} />
         </div>
       </div>
     </div>
@@ -621,6 +706,253 @@ const RecentFocusSessions = ({ recentSessions }) => {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AdvancedWeakTopicsCard = ({ weakTopics, weakDomains = [] }) => {
+  const [expandedDomains, setExpandedDomains] = useState({});
+
+  const toggleDomain = (domainId) => {
+    setExpandedDomains((prev) => ({
+      ...prev,
+      [domainId]: !prev[domainId],
+    }));
+  };
+
+  const domainGroups = weakDomains.length > 0 ? weakDomains : Object.values(
+    (weakTopics || []).reduce((acc, topic) => {
+      const dName = topic.domain || "General Domain";
+      if (!acc[dName]) {
+        acc[dName] = {
+          id: dName,
+          name: dName,
+          accuracy: topic.accuracy,
+          topics: [],
+        };
+      }
+      acc[dName].topics.push(topic);
+      return acc;
+    }, {})
+  );
+
+  const getStatusBadge = (status, accuracy) => {
+    if (status === "not_attempted" || accuracy === null || accuracy === undefined) {
+      return <span className="badge bg-secondary">Not Attempted</span>;
+    }
+    if (status === "weak" || accuracy < 60) {
+      return <span className="badge bg-danger">Weak ({accuracy}%)</span>;
+    }
+    return <span className="badge bg-success">Strong ({accuracy}%)</span>;
+  };
+
+  return (
+    <div className="card border-0 shadow-sm rounded-4 h-100">
+      <div className="card-body p-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="fw-bold mb-0">Weak Topics & Domain Drill-down</h5>
+          <span className="badge bg-secondary">{domainGroups.length} Domains</span>
+        </div>
+
+        {domainGroups.length === 0 ? (
+          <p className="text-muted mb-0">No weak domains or topics detected.</p>
+        ) : (
+          <div className="d-grid gap-3">
+            {domainGroups.map((domain, index) => {
+              const domainId = domain.id || domain.name || index;
+              const isExpanded = Boolean(expandedDomains[domainId]);
+              const topics = domain.topics || [];
+
+              return (
+                <div key={domainId} className="border rounded-3 p-3 bg-light">
+                  <div
+                    className="d-flex justify-content-between align-items-center"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => toggleDomain(domainId)}
+                  >
+                    <div>
+                      <strong className="fs-6 me-2">📂 {domain.name || domain.domain}</strong>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="badge bg-danger">{domain.accuracy || 0}% avg</span>
+                      <button className="btn btn-sm btn-outline-dark py-0 px-2 fw-bold">
+                        {isExpanded ? "▲ Collapse" : "▼ Expand Topics"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-2 border-top">
+                      <p className="small text-muted mb-2 fw-bold">Domain Topics & Accuracy Breakdown:</p>
+                      <div className="d-grid gap-2">
+                        {topics.map((t, tIdx) => (
+                          <div
+                            key={t.topic_id || t.id || tIdx}
+                            className="bg-white p-2 rounded border d-flex justify-content-between align-items-center"
+                          >
+                            <span className="fw-semibold small">📌 {t.topic || t.name}</span>
+                            <div className="d-flex align-items-center gap-2">
+                              {getStatusBadge(t.status, t.accuracy)}
+                              {t.total_attempts !== undefined && (
+                                <span className="small text-muted">({t.total_attempts} attempt{t.total_attempts === 1 ? "" : "s"})</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const RecommendationsCard = ({ recommendations }) => {
+  const getPriorityBadge = (priority) => {
+    if (priority === "high") return <span className="badge bg-danger">high</span>;
+    if (priority === "medium") return <span className="badge bg-warning text-dark">medium</span>;
+    return <span className="badge bg-secondary">low</span>;
+  };
+
+  return (
+    <div className="card border-0 shadow-sm rounded-4 h-100">
+      <div className="card-body p-4">
+        <h5 className="fw-bold">Enhanced Recommendations</h5>
+
+        {recommendations.length === 0 ? (
+          <p className="text-muted mb-0">
+            Recommendations appear after weak topics are detected.
+          </p>
+        ) : (
+          <div className="d-grid gap-3">
+            {recommendations.map((item, idx) => {
+              const sequence = item.study_sequence || [
+                "Read AI Summary",
+                "Practice Flashcards",
+                "Take Quiz",
+                "Retry Mock Exam"
+              ];
+
+              return (
+                <div key={item.topic_id || item.topic || idx} className="recommendation-panel p-3 border rounded-3 bg-white">
+                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <div className="d-flex align-items-center gap-2">
+                      <strong className="fs-6">{item.topic}</strong>
+                      {getPriorityBadge(item.priority)}
+                    </div>
+
+                    <span className="badge bg-warning text-dark">{item.accuracy}%</span>
+                  </div>
+
+                  {item.weakest_subtopic && (
+                    <div className="small text-muted mb-2">
+                      <strong>Weakest Subtopic:</strong> {item.weakest_subtopic}
+                    </div>
+                  )}
+
+                  <div className="mb-3 p-2 bg-light rounded border">
+                    <div className="small fw-bold text-primary mb-1">Study Sequence:</div>
+                    <ol className="mb-0 ps-3 small text-muted">
+                      {sequence.map((step) => (
+                        <li key={step} className="mb-1">
+                          <span className="fw-semibold text-dark">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="d-flex gap-2 flex-wrap">
+                    {(item.recommendations || []).map((action) => (
+                      <span key={action} className="recommendation-chip">
+                        {action}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TrendChart = ({ trendData }) => {
+  return (
+    <div className="card border-0 shadow-sm rounded-4 h-100">
+      <div className="card-body p-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="fw-bold mb-0">Topic Accuracy Trend</h5>
+          <span className="small text-muted">Last 3 mock attempts</span>
+        </div>
+
+        {trendData.length === 0 ? (
+          <p className="text-muted mb-0">
+            Trend data appears after exam attempts.
+          </p>
+        ) : (
+          <div>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="topic"
+                  fontSize={12}
+                  tick={({ x, y, payload }) => {
+                    const item = trendData.find((t) => t.topic === payload.value);
+                    const arrow = item?.trend_arrow || "—";
+                    return (
+                      <text x={x} y={y + 12} textAnchor="middle" fill="#666" fontSize={11}>
+                        {payload.value} {arrow}
+                      </text>
+                    );
+                  }}
+                />
+                <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                <Tooltip
+                  formatter={(value, name, props) => [
+                    `${value}% (${props.payload.improvement_label || "First attempt"})`,
+                    "Accuracy",
+                  ]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="accuracy"
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <div className="mt-3 pt-3 border-top">
+              <div className="small fw-bold mb-2 text-muted">Topic Performance & Improvement:</div>
+              <div className="d-flex gap-2 flex-wrap">
+                {trendData.map((item, idx) => {
+                  const arrow = item.trend_arrow || "—";
+                  const label = item.improvement_label || "First attempt";
+
+                  let badgeClass = "bg-secondary text-white";
+                  if (item.trend_direction === "improving") badgeClass = "bg-success text-white";
+                  if (item.trend_direction === "declining") badgeClass = "bg-danger text-white";
+
+                  return (
+                    <span key={item.topic_id || item.topic || idx} className={`badge p-2 ${badgeClass}`}>
+                      {item.topic}: {item.accuracy}% {arrow} ({label})
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

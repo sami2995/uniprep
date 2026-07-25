@@ -42,6 +42,12 @@ export const AuthProvider = ({ children }) => {
     return userResponse.data;
   };
 
+  const refreshUser = async () => {
+    const response = await api.get("/users/me/");
+    setUser(response.data);
+    return response.data;
+  };
+
   const register = async (formData) => {
     await api.post("/users/register/", formData);
   };
@@ -62,6 +68,7 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         login,
+        refreshUser,
         register,
         logout,
       }}

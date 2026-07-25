@@ -9,7 +9,7 @@ from .models import (
 from exit_exams.models import Topic
 
 
-def update_topic_performance(student, question, is_correct):
+def update_topic_performance(student, question, is_correct, response_time_seconds=0):
     topic = question.topic
     domain = topic.domain
 
@@ -19,15 +19,39 @@ def update_topic_performance(student, question, is_correct):
         defaults={
             "domain": domain,
             "correct_attempts": 0,
+            "wrong_attempts": 0,
             "total_attempts": 0,
+            "average_time_seconds": 0,
+            "trend": StudentTopicPerformance.Trend.STABLE,
         }
     )
 
+    previous_accuracy = performance.accuracy
+    previous_total = performance.total_attempts
     performance.domain = domain
     performance.total_attempts += 1
 
     if is_correct:
         performance.correct_attempts += 1
+    else:
+        performance.wrong_attempts += 1
+
+    if response_time_seconds and response_time_seconds > 0:
+        previous_time_total = performance.average_time_seconds * previous_total
+        performance.average_time_seconds = round(
+            (previous_time_total + response_time_seconds) / performance.total_attempts
+        )
+
+    new_accuracy = performance.accuracy
+
+    if previous_total == 0:
+        performance.trend = StudentTopicPerformance.Trend.STABLE
+    elif new_accuracy > previous_accuracy:
+        performance.trend = StudentTopicPerformance.Trend.IMPROVING
+    elif new_accuracy < previous_accuracy:
+        performance.trend = StudentTopicPerformance.Trend.DECLINING
+    else:
+        performance.trend = StudentTopicPerformance.Trend.STABLE
 
     performance.save()
     return performance
