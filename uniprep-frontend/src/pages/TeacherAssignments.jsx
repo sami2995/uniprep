@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../api/api";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 const TeacherAssignments = () => {
   const [assignments, setAssignments] = useState([]);
@@ -11,41 +12,29 @@ const TeacherAssignments = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      const [User] = await Promise.all([
-        api.get("/users/"),
-      ]);
-      // users endpoint may not exist — use assignments list to derive teachers
-    } catch { /* ignore */ }
-
-    try {
-      const [assignRes, courseRes] = await Promise.all([
+      const [assignRes, courseRes, teacherRes] = await Promise.all([
         api.get("/exit-exams/teacher-course-assignments/"),
         api.get("/exit-exams/courses/"),
+        api.get("/admin/teachers/"),
       ]);
 
       setAssignments(assignRes.data);
       setCourses(courseRes.data);
-
-      // Derive teacher list from assignments
-      const teacherMap = {};
-      assignRes.data.forEach((a) => {
-        if (a.teacher && a.teacher_username) {
-          teacherMap[a.teacher] = a.teacher_username;
-        }
-      });
-      setTeachers(Object.entries(teacherMap).map(([id, name]) => ({ id, name })));
+      setTeachers(teacherRes.data);
     } catch {
-      setError("Failed to load assignments.");
+      setError("Failed to load assignment data.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -92,7 +81,6 @@ const TeacherAssignments = () => {
     }
   };
 
-  // Group assignments by teacher for a nicer view
   const byTeacher = {};
   assignments.forEach((a) => {
     const tName = a.teacher_username || `Teacher #${a.teacher}`;
@@ -116,7 +104,6 @@ const TeacherAssignments = () => {
 
   return (
     <div className="container-fluid py-4">
-      {/* Hero */}
       <div className="dashboard-hero mb-4">
         <div>
           <span className="dashboard-badge">Department Head</span>
@@ -141,26 +128,35 @@ const TeacherAssignments = () => {
       )}
 
       <div className="row g-4">
-        {/* ── Assign Form ── */}
+        {/* Assign Form */}
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm rounded-4 mb-4">
             <div className="card-body p-4">
               <h5 className="fw-bold mb-3">New Assignment</h5>
               <form onSubmit={createAssignment}>
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Teacher ID</label>
-                  <input
+                  <label className="form-label fw-semibold">Teacher</label>
+                  <select
                     name="teacher"
-                    className="form-control"
-                    type="number"
+                    className="form-select"
                     value={form.teacher}
                     onChange={handleFormChange}
-                    placeholder="Enter teacher user ID…"
                     required
-                  />
-                  <div className="form-text">
-                    Enter the user ID of the teacher to assign.
-                  </div>
+                  >
+                    <option value="">Select a teacher...</option>
+                    {teachers
+                      .filter((t) => t.is_active)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.username}{" "}
+                          {t.email ? `(${t.email})` : ""}
+                        </option>
+                      ))}
+                  </select>
+                  <small className="form-text text-muted">
+                    {teachers.length === 0 &&
+                      "No teachers found in your department."}
+                  </small>
                 </div>
 
                 <div className="mb-3">
@@ -172,16 +168,25 @@ const TeacherAssignments = () => {
                     onChange={handleFormChange}
                     required
                   >
-                    <option value="">Select a course…</option>
+                    <option value="">Select a course...</option>
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
                     ))}
                   </select>
+                  <small className="form-text text-muted">
+                    {courses.length === 0 &&
+                      "No courses found in your department."}
+                  </small>
                 </div>
 
-                <button className="btn btn-primary w-100">Assign Teacher</button>
+                <button
+                  className="btn btn-primary w-100"
+                  disabled={teachers.length === 0 || courses.length === 0}
+                >
+                  Assign Teacher
+                </button>
               </form>
             </div>
           </div>
@@ -198,17 +203,21 @@ const TeacherAssignments = () => {
                 <span className="text-muted">Unique teachers</span>
                 <strong>{Object.keys(byTeacher).length}</strong>
               </div>
-              <div className="d-flex justify-content-between">
+              <div className="d-flex justify-content-between mb-2">
                 <span className="text-muted">Courses with assignments</span>
                 <strong>
                   {new Set(assignments.map((a) => a.course)).size}
                 </strong>
               </div>
+              <div className="d-flex justify-content-between">
+                <span className="text-muted">Available teachers</span>
+                <strong>{teachers.filter((t) => t.is_active).length}</strong>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── Assignment List ── */}
+        {/* Assignment List */}
         <div className="col-lg-8">
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-4">
@@ -217,14 +226,16 @@ const TeacherAssignments = () => {
                 <input
                   className="form-control form-control-sm"
                   style={{ maxWidth: 220 }}
-                  placeholder="Search teacher…"
+                  placeholder="Search teacher..."
                   value={filterTeacher}
                   onChange={(e) => setFilterTeacher(e.target.value)}
                 />
               </div>
 
               {filteredTeachers.length === 0 ? (
-                <p className="text-muted text-center py-4">No assignments found.</p>
+                <p className="text-muted text-center py-4">
+                  No assignments found.
+                </p>
               ) : (
                 <div className="d-grid gap-4">
                   {filteredTeachers.map(([teacherName, teacherAssignments]) => (
@@ -232,7 +243,11 @@ const TeacherAssignments = () => {
                       <div className="d-flex align-items-center gap-2 mb-2">
                         <div
                           className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-                          style={{ width: 36, height: 36, fontSize: "0.9rem" }}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            fontSize: "0.9rem",
+                          }}
                         >
                           {teacherName.charAt(0).toUpperCase()}
                         </div>
@@ -246,11 +261,17 @@ const TeacherAssignments = () => {
 
                       <div className="d-grid gap-2 ps-4">
                         {teacherAssignments.map((a) => (
-                          <div key={a.id} className="d-flex justify-content-between align-items-center blueprint-rule-row">
+                          <div
+                            key={a.id}
+                            className="d-flex justify-content-between align-items-center blueprint-rule-row"
+                          >
                             <div>
-                              <span className="fw-semibold small">{a.course_name}</span>
+                              <span className="fw-semibold small">
+                                {a.course_name}
+                              </span>
                               <p className="text-muted small mb-0">
-                                Assigned {new Date(a.assigned_at).toLocaleDateString()}
+                                Assigned{" "}
+                                {new Date(a.assigned_at).toLocaleDateString()}
                               </p>
                             </div>
                             <button

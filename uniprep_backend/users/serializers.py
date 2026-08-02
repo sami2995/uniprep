@@ -25,6 +25,16 @@ class RegisterSerializer(serializers.ModelSerializer):
             "year_of_study",
         ]
 
+    def validate_department(self, value):
+        if not value:
+            return value
+        from exit_exams.models import Department
+        if not Department.objects.filter(name__iexact=value).exists():
+            raise serializers.ValidationError(
+                "Selected department does not match any existing department."
+            )
+        return value
+
     def validate(self, data):
         if data["password"] != data["password2"]:
             raise serializers.ValidationError(
@@ -38,21 +48,29 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
 
         student_id = validated_data.pop("student_id", "")
-        department = validated_data.pop("department", "")
+        department_name = validated_data.pop("department", "")
         program = validated_data.pop("program", "")
         year_of_study = validated_data.pop("year_of_study", None)
+
+        from exit_exams.models import Department
+        department = None
+        if department_name:
+            department = Department.objects.filter(
+                name__iexact=department_name
+            ).first()
 
         user = CustomUser.objects.create_user(
             username=validated_data.get("username"),
             email=validated_data.get("email"),
             password=password,
-            role=CustomUser.Role.STUDENT
+            role=CustomUser.Role.STUDENT,
+            department=department,
         )
 
         StudentProfile.objects.create(
             user=user,
             student_id=student_id,
-            department=department,
+            department=department_name,
             program=program,
             year_of_study=year_of_study
         )
@@ -110,6 +128,38 @@ class UserSerializer(serializers.ModelSerializer):
                     setattr(student_profile, field, value)
             student_profile.save()
 
+        return instance
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=8, required=False)
+    department_name = serializers.CharField(source="department.name", read_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id", "username", "email", "password", "role",
+            "department", "department_name", "is_active",
+            "date_joined", "first_name", "last_name",
+        ]
+        read_only_fields = ["id", "date_joined", "department_name"]
+
+    def create(self, validated_data):
+        password = validated_data.pop("password", None)
+        if not password:
+            raise serializers.ValidationError({"password": "Password is required for new users."})
+        user = CustomUser.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
         return instance
 
 

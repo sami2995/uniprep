@@ -87,7 +87,8 @@ def create_challenge(request):
         approved_questions = list(
             Question.objects.filter(
                 topic__domain__course=course,
-                is_active=True
+                is_active=True,
+                status=Question.Status.APPROVED
             ).prefetch_related("choices").distinct()
         )
 

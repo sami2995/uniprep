@@ -101,7 +101,7 @@ const SystemAdminDashboard = () => {
               </div>
               <div>
                 <small className="text-muted text-uppercase fw-semibold">Total Students</small>
-                <h3 className="fw-bold mb-0">{dashStats?.total_students || 0}</h3>
+                <h3 className="fw-bold mb-0">{dashStats?.users?.total_students || 0}</h3>
               </div>
             </div>
           </div>
@@ -115,7 +115,7 @@ const SystemAdminDashboard = () => {
               </div>
               <div>
                 <small className="text-muted text-uppercase fw-semibold">Total Teachers</small>
-                <h3 className="fw-bold mb-0">{dashStats?.total_teachers || 0}</h3>
+                <h3 className="fw-bold mb-0">{dashStats?.users?.total_teachers || 0}</h3>
               </div>
             </div>
           </div>
@@ -129,7 +129,7 @@ const SystemAdminDashboard = () => {
               </div>
               <div>
                 <small className="text-muted text-uppercase fw-semibold">Departments</small>
-                <h3 className="fw-bold mb-0">{dashStats?.total_departments || 0}</h3>
+                <h3 className="fw-bold mb-0">{dashStats?.academic_structure?.total_departments || 0}</h3>
               </div>
             </div>
           </div>

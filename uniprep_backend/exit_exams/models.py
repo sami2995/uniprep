@@ -645,6 +645,9 @@ class SystemSettings(models.Model):
     default_passing_score = models.PositiveIntegerField(default=50)
     default_exam_duration_minutes = models.PositiveIntegerField(default=60)
     max_battle_participants = models.PositiveIntegerField(default=8)
+    mastery_threshold_accuracy = models.PositiveIntegerField(default=80)
+    mastery_minimum_attempts = models.PositiveIntegerField(default=3)
+    quiz_unlock_score = models.PositiveIntegerField(default=70)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

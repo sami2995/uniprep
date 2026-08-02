@@ -3,7 +3,8 @@ import { useParams } from "react-router-dom";
 import {
   FileText, MessageSquare, CreditCard, HelpCircle,
   Volume2, ChevronLeft, ChevronRight, RotateCcw,
-  Play, Pause, StopCircle, Zap, Loader
+  Play, Pause, StopCircle, Zap, Loader, Sparkles,
+  MoreVertical, ArrowUp
 } from "lucide-react";
 import api from "../api/api";
 
@@ -36,6 +37,7 @@ const StudyMaterialDetail = () => {
   /* Chat state */
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput,    setChatInput]    = useState("");
+  const [isSending,    setIsSending]    = useState(false);
   const chatEndRef = useRef(null);
 
   /* Audio state */
@@ -56,6 +58,32 @@ const StudyMaterialDetail = () => {
 
   const isCompleted = material?.processing_status === "completed";
 
+  /* ── Load existing artifacts on first open ── */
+  const loadArtifacts = async () => {
+    if (!isCompleted) return;
+    try {
+      const [sumRes, flashRes, quizRes, chatRes] = await Promise.all([
+        api.get(`/rag/materials/${materialId}/summary/`),
+        api.get(`/rag/materials/${materialId}/flashcards/`),
+        api.get(`/rag/materials/${materialId}/quiz/`),
+        api.get(`/rag/materials/${materialId}/chat/`),
+      ]);
+      setSummary(sumRes.data.summary);
+      setFlashcards(flashRes.data.flashcards || []);
+      setQuiz(quizRes.data);
+      setChatMessages(chatRes.data.messages || []);
+    } catch (e) {
+      // Silently ignore individual failures; user can still regenerate.
+    }
+  };
+
+  useEffect(() => {
+    if (material && isCompleted) {
+      loadArtifacts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialId, material?.processing_status]);
+
   /* ── Generate summary ── */
   const generateSummary = async () => {
     setError(""); setLoadingAction("summary");
@@ -75,6 +103,7 @@ const StudyMaterialDetail = () => {
     setChatInput("");
     setChatMessages((m) => [...m, { role: "user", text: q }]);
     setChatMessages((m) => [...m, { role: "ai", text: "…", thinking: true }]);
+    setIsSending(true);
     try {
       const res = await api.post(`/rag/materials/${materialId}/ask/`, { question: q });
       const answer  = res.data.answer || "No answer returned.";
@@ -90,6 +119,8 @@ const StudyMaterialDetail = () => {
         updated[updated.length - 1] = { role: "ai", text: "Sorry, I couldn't get an answer. Please try again.", error: true };
         return updated;
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -247,31 +278,51 @@ const StudyMaterialDetail = () => {
 
       {/* ══ Chat tab ══ */}
       {activeTab === "ask" && (
-        <div>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="fw-bold mb-0">Chat with your Material</h5>
-            <span className="badge bg-light text-muted" style={{ fontSize: "0.75rem" }}>RAG — answers from your document only</span>
-          </div>
+        <div className="chat-panel">
+          <div className="chat-card">
+            {/* Header */}
+            <div className="chat-header d-flex align-items-center gap-3 px-3 py-3 border-bottom bg-white">
+              <div className="chat-header-avatar">
+                <Sparkles size={16} />
+              </div>
+              <div className="flex-fill" style={{ minWidth: 0 }}>
+                <div className="chat-header-title">AI study chat</div>
+                <div className="chat-header-subtitle">Grounded in: {material.title}</div>
+              </div>
+              <button className="chat-header-menu" type="button" aria-label="Chat options">
+                <MoreVertical size={16} />
+              </button>
+            </div>
 
-          <div className="card border-0 shadow-sm rounded-4" style={{ overflow: "hidden" }}>
             {/* Messages */}
-            <div className="chat-messages p-4" style={{ minHeight: 280, maxHeight: 420, overflowY: "auto" }}>
+            <div className="chat-messages d-flex flex-column gap-3 p-3 overflow-auto">
               {chatMessages.length === 0 && (
-                <div className="text-center py-4 text-muted" style={{ fontSize: "0.9rem" }}>
-                  <MessageSquare size={32} color="#cbd5e1" className="mb-2" />
-                  <p className="mb-0">Ask anything about <strong>{material.title}</strong></p>
-                  <p className="small">e.g. "What are the main topics?" or "Explain the first concept."</p>
+                <div className="chat-empty text-center text-muted m-auto px-3">
+                  <MessageSquare size={32} className="mb-2 d-block mx-auto" style={{ color: "#cbd5e1" }} />
+                  <p className="mb-0 small">Ask a question about this material to get started.</p>
                 </div>
               )}
 
               {chatMessages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 10 }}>
+                <div
+                  key={i}
+                  className={`chat-row d-flex align-items-end ${msg.role === "user" ? "justify-content-end" : "justify-content-start"}`}
+                >
+                  {msg.role === "ai" && (
+                    <div className="chat-avatar flex-shrink-0">
+                      <Sparkles size={14} />
+                    </div>
+                  )}
                   <div className={`chat-bubble ${msg.role} ${msg.thinking ? "thinking" : ""}`}>
                     {msg.thinking ? (
-                      <span className="d-flex align-items-center gap-2">
-                        <Loader size={13} className="spin-icon" /> Searching your material…
+                      <span className="typing-dots d-flex align-items-center gap-1">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
                       </span>
-                    ) : msg.text}
+                    ) : (
+                      msg.text
+                    )}
                     {/* Source chips */}
                     {msg.sources?.length > 0 && (
                       <div className="mt-2 d-flex gap-1 flex-wrap">
@@ -289,17 +340,22 @@ const StudyMaterialDetail = () => {
             </div>
 
             {/* Input */}
-            <div style={{ borderTop: "1px solid #e2e8f0", padding: "14px 16px", background: "#fafbfc" }}>
-              <form onSubmit={sendChatMessage} className="d-flex gap-2">
+            <div className="chat-input-bar p-3 border-top bg-white">
+              <form onSubmit={sendChatMessage} className="chat-form d-flex align-items-center gap-2">
                 <input
-                  className="form-control"
+                  className="form-control chat-input"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask a question about this material…"
-                  disabled={!isCompleted}
+                  placeholder="Ask about this material"
+                  disabled={!isCompleted || isSending}
                 />
-                <button className="btn btn-primary px-3" disabled={!isCompleted || !chatInput.trim()}>
-                  Send
+                <button
+                  className="chat-send-btn"
+                  type="submit"
+                  disabled={!isCompleted || !chatInput.trim() || isSending}
+                  aria-label="Send"
+                >
+                  <ArrowUp size={18} />
                 </button>
               </form>
             </div>
@@ -350,7 +406,7 @@ const StudyMaterialDetail = () => {
             </button>
           </div>
 
-          {quiz?.ai_status !== "ai_generated" && quiz && (
+          {quiz?.ai_status === "fallback_generated" && (
             <div className="alert alert-warning small">AI quiz generation unavailable — showing fallback questions.</div>
           )}
 

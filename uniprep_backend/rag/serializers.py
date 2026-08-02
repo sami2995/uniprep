@@ -12,6 +12,15 @@ from .models import (
 
 
 class StudyMaterialSerializer(serializers.ModelSerializer):
+    course_name = serializers.CharField(source="course.name", read_only=True, default=None)
+    domain_name = serializers.CharField(source="domain.name", read_only=True, default=None)
+    topic_name = serializers.CharField(source="topic.name", read_only=True, default=None)
+    owner_name = serializers.CharField(source="owner.get_full_name", read_only=True, default=None)
+    chunk_count = serializers.SerializerMethodField()
+    has_summary = serializers.SerializerMethodField()
+    has_flashcards = serializers.SerializerMethodField()
+    has_quiz = serializers.SerializerMethodField()
+
     class Meta:
         model = StudyMaterial
         fields = "__all__"
@@ -21,6 +30,18 @@ class StudyMaterialSerializer(serializers.ModelSerializer):
             "error_message",
             "uploaded_at"
         ]
+
+    def get_chunk_count(self, obj):
+        return obj.chunks.count()
+
+    def get_has_summary(self, obj):
+        return hasattr(obj, "summary") and obj.summary is not None
+
+    def get_has_flashcards(self, obj):
+        return obj.flashcards.exists()
+
+    def get_has_quiz(self, obj):
+        return obj.generated_quizzes.exists()
 
 
 class DocumentChunkSerializer(

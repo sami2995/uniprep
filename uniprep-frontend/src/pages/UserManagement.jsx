@@ -13,6 +13,8 @@ import {
   AlertCircle,
   CheckCircle,
   X,
+  Plus,
+  UserPlus,
 } from "lucide-react";
 
 const ROLE_LABELS = {
@@ -37,6 +39,19 @@ const UserManagement = () => {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // New user form state
+  const [departments, setDepartments] = useState([]);
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    role: "student",
+    department_id: "",
+  });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
 
   // Password reset modal state
   const [resetModalUser, setResetModalUser] = useState(null);
@@ -70,6 +85,85 @@ const UserManagement = () => {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const response = await api.get("/exit-exams/departments/");
+        setDepartments(response.data);
+      } catch (err) {
+        setFormError("Failed to load departments.");
+      }
+    };
+    loadDepartments();
+  }, []);
+
+  const isDepartmentRequired = (role) =>
+    role === "teacher" || role === "department_head";
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "role" && !isDepartmentRequired(value)) {
+        next.department_id = "";
+      }
+      return next;
+    });
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    setFormSuccess("");
+
+    if (isDepartmentRequired(form.role) && !form.department_id) {
+      setFormError("Department is required for this role.");
+      return;
+    }
+
+    setFormLoading(true);
+    try {
+      const payload = {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+      };
+      if (form.department_id) {
+        payload.department_id = form.department_id;
+      }
+
+      await api.post("/users/admin-create-user/", payload);
+      setForm({
+        username: "",
+        email: "",
+        password: "",
+        role: "student",
+        department_id: "",
+      });
+      setFormSuccess("User created successfully.");
+      await fetchUsers();
+    } catch (err) {
+      const data = err.response?.data;
+      const messages = [];
+      if (data) {
+        Object.entries(data).forEach(([field, value]) => {
+          const label = field === "detail" ? "" : `${field}: `;
+          if (Array.isArray(value)) {
+            messages.push(`${label}${value.join(" ")}`);
+          } else {
+            messages.push(`${label}${value}`);
+          }
+        });
+      }
+      setFormError(
+        messages.length ? messages.join(" ") : "Failed to create user."
+      );
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -158,6 +252,133 @@ const UserManagement = () => {
           <div>{success}</div>
         </div>
       )}
+
+      {/* Create User Form */}
+      <div className="card border-0 shadow-sm rounded-4 mb-4">
+        <div className="card-body p-4">
+          <h5 className="fw-bold mb-3 d-flex align-items-center gap-2">
+            <UserPlus size={18} className="text-primary" />
+            <span>New User</span>
+          </h5>
+
+          {formError && (
+            <div className="alert alert-danger d-flex align-items-center gap-2 mb-3">
+              <AlertCircle size={18} />
+              <div>{formError}</div>
+            </div>
+          )}
+
+          {formSuccess && (
+            <div className="alert alert-success d-flex align-items-center gap-2 mb-3">
+              <CheckCircle size={18} />
+              <div>{formSuccess}</div>
+            </div>
+          )}
+
+          <form onSubmit={handleFormSubmit}>
+            <div className="row g-3">
+              <div className="col-md-6 col-lg-3">
+                <label className="form-label fw-medium">Username</label>
+                <input
+                  type="text"
+                  name="username"
+                  className="form-control rounded-3"
+                  placeholder="Username"
+                  value={form.username}
+                  onChange={handleFormChange}
+                  required
+                />
+              </div>
+
+              <div className="col-md-6 col-lg-3">
+                <label className="form-label fw-medium">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  className="form-control rounded-3"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={handleFormChange}
+                  required
+                />
+              </div>
+
+              <div className="col-md-6 col-lg-3">
+                <label className="form-label fw-medium">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  className="form-control rounded-3"
+                  placeholder="Password"
+                  value={form.password}
+                  onChange={handleFormChange}
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="col-md-6 col-lg-2">
+                <label className="form-label fw-medium">Role</label>
+                <select
+                  name="role"
+                  className="form-select rounded-3"
+                  value={form.role}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="student">Student</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="department_head">Department Head</option>
+                </select>
+              </div>
+
+              <div className="col-md-6 col-lg-3">
+                <label className="form-label fw-medium">
+                  Department
+                  {isDepartmentRequired(form.role) && (
+                    <span className="text-danger">*</span>
+                  )}
+                </label>
+                <select
+                  name="department_id"
+                  className="form-select rounded-3"
+                  value={form.department_id}
+                  onChange={handleFormChange}
+                  required={isDepartmentRequired(form.role)}
+                >
+                  <option value="">
+                    {isDepartmentRequired(form.role)
+                      ? "Select department"
+                      : "— Optional —"}
+                  </option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-md-6 col-lg-2 d-flex align-items-end">
+                <button
+                  type="submit"
+                  className="btn btn-primary w-100 rounded-3"
+                  disabled={formLoading}
+                >
+                  {formLoading ? (
+                    "Creating..."
+                  ) : (
+                    <>
+                      <Plus size={16} className="me-1" />
+                      Create User
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
 
       {/* Filter Bar */}
       <div className="card border-0 shadow-sm rounded-4 mb-4">

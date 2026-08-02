@@ -108,19 +108,17 @@ const StudentDashboard = () => {
   const [focusSummary, setFocusSummary] = useState(null);
   const [weakTopics, setWeakTopics] = useState([]);
   const [weakDomains, setWeakDomains] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [trendData, setTrendData] = useState([]);
-
   const [recentResults, setRecentResults] = useState([]);
   const [recentMaterials, setRecentMaterials] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
-
+  const [recommendations, setRecommendations] = useState([]);
+  const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [dailyGoal, setDailyGoal] = useState(getDailyGoalMinutes());
-  const [goalInput, setGoalInput] = useState(getDailyGoalMinutes());
   const [streak, setStreak] = useState(getStudyStreak());
+  const [dailyGoal, setDailyGoal] = useState(getDailyGoalMinutes());
+  const [goalInput, setGoalInput] = useState(String(getDailyGoalMinutes()));
+  const [adaptivePath, setAdaptivePath] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -131,9 +129,6 @@ const StudentDashboard = () => {
       setLoading(true);
       setError("");
 
-      // Fetch the core dashboard first (required). Other analytics/endpoints
-      // are non-blocking: use Promise.allSettled so a single failure won't
-      // prevent the page from rendering.
       const dashboardRes = await api.get("/analytics/dashboard/");
       const dashboardData = dashboardRes.data;
 
@@ -141,11 +136,19 @@ const StudentDashboard = () => {
         api.get("/exit-exams/my-results/"),
         api.get("/rag/materials/"),
         api.get("/analytics/focus/summary/"),
+        api.get("/adaptive-learning/current/"),
       ]);
 
       const resultsRes = settled[0].status === "fulfilled" ? settled[0].value : { data: [] };
       const materialsRes = settled[1].status === "fulfilled" ? settled[1].value : { data: [] };
       const focusRes = settled[2].status === "fulfilled" ? settled[2].value : { data: dashboardData?.focus_summary || {} };
+      const adaptiveRes = settled[3].status === "fulfilled" ? settled[3].value : null;
+
+      if (adaptiveRes && adaptiveRes.data) {
+        setAdaptivePath(adaptiveRes.data);
+      } else {
+        setAdaptivePath(null);
+      }
 
       const focusData = (focusRes && focusRes.data) || {};
 
@@ -317,23 +320,29 @@ const StudentDashboard = () => {
         />
       </div>
         <div className="row g-3 mt-3">
-  <div className="col-lg-12">
-    <div className="battle-dashboard-card">
-      <div>
-        <span className="dashboard-badge">Competitive Learning</span>
-        <h4 className="fw-bold mt-2 mb-1">Battle Mode</h4>
-        <p className="text-muted mb-0">
-          Challenge classmates using the same approved exam questions. Compete
-          by score and completion time on the leaderboard.
-        </p>
-      </div>
+          <div className="col-12">
+            <AdaptiveLearningCard path={adaptivePath} />
+          </div>
+        </div>
 
-      <Link className="btn btn-success" to="/student/battle">
-        Start Battle
-      </Link>
-    </div>
-  </div>
-</div>
+        <div className="row g-3 mt-3">
+          <div className="col-lg-12">
+            <div className="battle-dashboard-card">
+              <div>
+                <span className="dashboard-badge">Competitive Learning</span>
+                <h4 className="fw-bold mt-2 mb-1">Battle Mode</h4>
+                <p className="text-muted mb-0">
+                  Challenge classmates using the same approved exam questions. Compete
+                  by score and completion time on the leaderboard.
+                </p>
+              </div>
+
+              <Link className="btn btn-success" to="/student/battle">
+                Start Battle
+              </Link>
+            </div>
+          </div>
+        </div>
       <div className="row g-3 mt-3">
         <div className="col-lg-5">
           <DailyStudyGoalCard
@@ -999,6 +1008,88 @@ const SpacedRepetitionCard = ({ dueItems }) => {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AdaptiveLearningCard = ({ path }) => {
+  const getPriorityBadge = (priority) => {
+    if (priority === "high") return <span className="badge bg-danger">High Priority</span>;
+    if (priority === "medium") return <span className="badge bg-warning text-dark">Medium Priority</span>;
+    return <span className="badge bg-secondary">Low Priority</span>;
+  };
+
+  const steps = path?.steps || [];
+  const completedCount = steps.filter((s) => s.completed).length;
+  const progressPercent = Math.round((completedCount / 4) * 100);
+
+  return (
+    <div className="card border-0 shadow-sm rounded-4 h-100 bg-white">
+      <div className="card-body p-4">
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+          <div>
+            <span className="dashboard-badge mb-1">Adaptive Learning Engine</span>
+            <h4 className="fw-bold mt-1 mb-1">
+              {path ? `Topic: ${path.topic}` : "Today's Learning Path"}
+            </h4>
+            <p className="text-muted small mb-0">
+              {path
+                ? `Current step: ${path.current_step?.replace("_", " ")?.toUpperCase()}`
+                : "Ties summary, flashcards, quiz, mini-mock & spaced repetition into one journey."}
+            </p>
+          </div>
+          {path && getPriorityBadge(path.priority)}
+        </div>
+
+        {path ? (
+          <div>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small fw-semibold text-muted">
+                Step Progress ({completedCount} of 4 completed)
+              </span>
+              <span className="fw-bold text-primary">{progressPercent}%</span>
+            </div>
+            <div className="progress mb-3" style={{ height: "10px" }}>
+              <div
+                className="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div className="d-flex gap-1 mb-3">
+              {["summary", "flashcards", "quiz", "mini_mock"].map((st) => {
+                const sObj = steps.find((s) => s.step_type === st);
+                let bgClass = "bg-secondary text-white";
+                if (sObj?.completed) bgClass = "bg-success text-white";
+                else if (path.current_step === st) bgClass = "bg-primary text-white";
+
+                return (
+                  <div
+                    key={st}
+                    className={`flex-fill text-center py-1 rounded small fw-semibold ${bgClass}`}
+                    style={{ fontSize: "11px" }}
+                  >
+                    {st.replace("_", " ")}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Link className="btn btn-primary w-100 fw-bold rounded-3" to="/student/learning">
+              Continue Learning →
+            </Link>
+          </div>
+        ) : (
+          <div>
+            <p className="text-muted small mb-3">
+              No active learning path in progress. Click below to automatically generate your next highest-priority topic journey based on your weakest areas and spaced repetition queue.
+            </p>
+            <Link className="btn btn-primary w-100 fw-bold rounded-3" to="/student/learning">
+              Start Learning Path →
+            </Link>
+          </div>
         )}
       </div>
     </div>

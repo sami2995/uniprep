@@ -79,6 +79,13 @@ from .services.audit_logger import (
     snapshot_blueprint,
     snapshot_assignment,
 )
+from .services.question_selector import (
+    select_questions_for_domain,
+    select_questions_for_course,
+    select_questions_for_topic,
+    select_questions_for_blueprint,
+    rank_questions_for_student,
+)
 
 
 # --------------------------------------------------
@@ -291,548 +298,6 @@ def user_can_access_import(user, exam_import):
     return False
 
 
-import random
-
-from .models import Question, MockExamQuestion, AttemptDetail
-
-
-def select_questions_for_domain(user, domain, count):
-    """
-    Flexible question selection for one domain.
-
-    Priority:
-    1. Unused/unseen questions
-    2. Previously wrong questions
-    3. Any remaining questions if needed
-
-    This prevents hard errors when unused questions are not enough.
-    """
-
-    all_questions = Question.objects.filter(
-        topic__domain=domain,
-        is_active=True,
-        status=Question.Status.APPROVED
-    ).select_related(
-        "topic",
-        "topic__domain"
-    ).prefetch_related("choices")
-
-    available_count = all_questions.count()
-
-    if available_count < count:
-        raise ValueError(
-            f"Not enough questions in domain '{domain.name}'. "
-            f"Available: {available_count}, required: {count}."
-        )
-
-    attempted_question_ids = AttemptDetail.objects.filter(
-        attempt__student=user,
-        question__topic__domain=domain
-    ).values_list("question_id", flat=True).distinct()
-
-    wrong_question_ids = AttemptDetail.objects.filter(
-        attempt__student=user,
-        question__topic__domain=domain,
-        is_correct=False
-    ).values_list("question_id", flat=True).distinct()
-
-    selected_questions = []
-    selected_ids = set()
-
-    # 1. Prefer unseen questions
-    unseen_questions = list(
-        all_questions.exclude(id__in=attempted_question_ids)
-    )
-
-    random.shuffle(unseen_questions)
-
-    for question in unseen_questions:
-        if len(selected_questions) >= count:
-            break
-
-        selected_questions.append(question)
-        selected_ids.add(question.id)
-
-    # 2. If not enough, add previously wrong questions
-    if len(selected_questions) < count:
-        wrong_questions = list(
-            all_questions.filter(id__in=wrong_question_ids)
-            .exclude(id__in=selected_ids)
-        )
-
-        random.shuffle(wrong_questions)
-
-        for question in wrong_questions:
-            if len(selected_questions) >= count:
-                break
-
-            selected_questions.append(question)
-            selected_ids.add(question.id)
-
-    # 3. If still not enough, fill with any remaining questions
-    if len(selected_questions) < count:
-        remaining_questions = list(
-            all_questions.exclude(id__in=selected_ids)
-        )
-
-        random.shuffle(remaining_questions)
-
-        for question in remaining_questions:
-            if len(selected_questions) >= count:
-                break
-
-            selected_questions.append(question)
-            selected_ids.add(question.id)
-
-    if len(selected_questions) < count:
-        raise ValueError(
-            f"Could not select enough questions from domain '{domain.name}'. "
-            f"Selected: {len(selected_questions)}, required: {count}."
-        )
-
-    return selected_questions
-
-
-def select_questions_for_course(user, course, total_questions):
-    """
-    Flexible question selection for whole course mock exam.
-
-    Priority:
-    1. Unused/unseen questions
-    2. Previously wrong questions
-    3. Any remaining questions if needed
-    """
-
-    all_questions = Question.objects.filter(
-        topic__domain__course=course,
-        is_active=True,
-        status=Question.Status.APPROVED
-    ).select_related(
-        "topic",
-        "topic__domain"
-    ).prefetch_related("choices")
-
-    available_count = all_questions.count()
-
-    if available_count < total_questions:
-        raise ValueError(
-            f"Not enough questions. "
-            f"Available: {available_count}, requested: {total_questions}."
-        )
-
-    attempted_question_ids = AttemptDetail.objects.filter(
-        attempt__student=user,
-        question__topic__domain__course=course
-    ).values_list("question_id", flat=True).distinct()
-
-    wrong_question_ids = AttemptDetail.objects.filter(
-        attempt__student=user,
-        question__topic__domain__course=course,
-        is_correct=False
-    ).values_list("question_id", flat=True).distinct()
-
-    selected_questions = []
-    selected_ids = set()
-
-    # 1. Prefer unseen questions
-    unseen_questions = list(
-        all_questions.exclude(id__in=attempted_question_ids)
-    )
-
-    random.shuffle(unseen_questions)
-
-    for question in unseen_questions:
-        if len(selected_questions) >= total_questions:
-            break
-
-        selected_questions.append(question)
-        selected_ids.add(question.id)
-
-    # 2. If not enough, add previously wrong questions
-    if len(selected_questions) < total_questions:
-        wrong_questions = list(
-            all_questions.filter(id__in=wrong_question_ids)
-            .exclude(id__in=selected_ids)
-        )
-
-        random.shuffle(wrong_questions)
-
-        for question in wrong_questions:
-            if len(selected_questions) >= total_questions:
-                break
-
-            selected_questions.append(question)
-            selected_ids.add(question.id)
-
-    # 3. If still not enough, fill with any remaining questions
-    if len(selected_questions) < total_questions:
-        remaining_questions = list(
-            all_questions.exclude(id__in=selected_ids)
-        )
-
-        random.shuffle(remaining_questions)
-
-        for question in remaining_questions:
-            if len(selected_questions) >= total_questions:
-                break
-
-            selected_questions.append(question)
-            selected_ids.add(question.id)
-
-    if len(selected_questions) < total_questions:
-        raise ValueError(
-            f"Could not select enough questions. "
-            f"Selected: {len(selected_questions)}, required: {total_questions}."
-        )
-
-    return selected_questions
-
-def rank_questions_for_student(user, queryset):
-    """
-    Rank questions by priority:
-
-    1. Questions never used in a previous mock exam
-    2. Previously answered incorrectly
-    3. Any other previously used questions
-    """
-
-    questions = list(
-        queryset.select_related(
-            "topic",
-            "topic__domain",
-            "topic__domain__course"
-        ).prefetch_related("choices")
-    )
-
-    if not questions:
-        return []
-
-    question_ids = [question.id for question in questions]
-
-    used_question_ids = set(
-        MockExamQuestion.objects.filter(
-            mock_exam__student=user,
-            question_id__in=question_ids
-        ).values_list("question_id", flat=True)
-    )
-
-    wrong_question_ids = set(
-        AttemptDetail.objects.filter(
-            attempt__student=user,
-            question_id__in=question_ids,
-            is_correct=False
-        ).values_list("question_id", flat=True)
-    )
-
-    unseen_questions = [
-        question
-        for question in questions
-        if question.id not in used_question_ids
-    ]
-
-    wrong_questions = [
-        question
-        for question in questions
-        if question.id in wrong_question_ids
-        and question.id in used_question_ids
-    ]
-
-    prioritized_ids = {
-        question.id
-        for question in unseen_questions + wrong_questions
-    }
-
-    remaining_questions = [
-        question
-        for question in questions
-        if question.id not in prioritized_ids
-    ]
-
-    random.shuffle(unseen_questions)
-    random.shuffle(wrong_questions)
-    random.shuffle(remaining_questions)
-
-    return (
-        unseen_questions
-        + wrong_questions
-        + remaining_questions
-    )
-
-
-def select_questions_for_blueprint(user, blueprint):
-    """
-    Generate an exam using blueprint topic rules.
-
-    Selection process:
-    1. Select questions from the exact required topic.
-    2. Fill shortages using other questions in the same domain.
-    3. Fill remaining shortages using the whole course.
-    4. Never duplicate a question inside the same mock exam.
-
-    Returns:
-        selected_questions
-        allocation_report
-        warnings
-    """
-
-    topic_rules = list(
-        blueprint.topic_rules.select_related(
-            "topic",
-            "topic__domain",
-            "topic__domain__course"
-        ).order_by(
-            "topic__domain__name",
-            "topic__name"
-        )
-    )
-
-    domain_rules = list(
-        blueprint.domain_rules.select_related("domain").order_by("domain__name")
-    )
-
-    if not topic_rules and not domain_rules:
-        raise ValueError(
-            "This blueprint has no domain or topic rules."
-        )
-
-    if not topic_rules and domain_rules:
-        domain_rule_total = sum(r.number_of_questions for r in domain_rules)
-        if domain_rule_total != blueprint.total_questions:
-            raise ValueError(
-                f"Blueprint total_questions is {blueprint.total_questions}, but domain rules add up to {domain_rule_total}."
-            )
-
-        selected_ids = set()
-        selected_questions = []
-        allocation_report = []
-        warnings = []
-
-        for rule in domain_rules:
-            domain_qs = Question.objects.filter(
-                topic__domain=rule.domain,
-                is_active=True,
-                status=Question.Status.APPROVED
-            ).exclude(id__in=selected_ids)
-
-            ranked = rank_questions_for_student(user, domain_qs)
-            chosen = list(ranked[:rule.number_of_questions])
-            selected_questions.extend(chosen)
-            selected_ids.update(q.id for q in chosen)
-
-            if len(chosen) < rule.number_of_questions:
-                shortage = rule.number_of_questions - len(chosen)
-                warnings.append({
-                    "domain": rule.domain.name,
-                    "required": rule.number_of_questions,
-                    "allocated": len(chosen),
-                    "shortage": shortage
-                })
-
-            allocation_report.append({
-                "domain": rule.domain.name,
-                "required": rule.number_of_questions,
-                "selected_total": len(chosen)
-            })
-
-        if len(selected_questions) < blueprint.total_questions:
-            remaining_needed = blueprint.total_questions - len(selected_questions)
-            course_qs = Question.objects.filter(
-                topic__domain__course=blueprint.course,
-                is_active=True,
-                status=Question.Status.APPROVED
-            ).exclude(id__in=selected_ids)
-
-            fallback = list(rank_questions_for_student(user, course_qs)[:remaining_needed])
-            selected_questions.extend(fallback)
-
-        if len(selected_questions) < blueprint.total_questions:
-            raise ValueError(
-                f"Not enough questions available to fulfill blueprint. Generated {len(selected_questions)} of {blueprint.total_questions}."
-            )
-
-        random.shuffle(selected_questions)
-        return selected_questions, allocation_report, warnings
-
-    topic_rule_total = sum(
-        rule.question_count
-        for rule in topic_rules
-    )
-
-    if topic_rule_total != blueprint.total_questions:
-        raise ValueError(
-            f"Blueprint total_questions is "
-            f"{blueprint.total_questions}, but topic rules "
-            f"add up to {topic_rule_total}."
-        )
-
-    total_available = Question.objects.filter(
-        topic__domain__course=blueprint.course,
-        is_active=True,
-        status=Question.Status.APPROVED
-    ).count()
-
-    if total_available < blueprint.total_questions:
-        raise ValueError(
-            f"Not enough active questions for this blueprint. "
-            f"Available: {total_available}, "
-            f"required: {blueprint.total_questions}."
-        )
-
-    selected_by_rule = {}
-    selected_ids = set()
-    allocation_report = []
-    warnings = []
-
-    # --------------------------------------------------
-    # Pass 1: Give every topic its exact available questions
-    # before fallback questions are used.
-    # --------------------------------------------------
-
-    for rule in topic_rules:
-        topic_queryset = Question.objects.filter(
-            topic=rule.topic,
-            is_active=True,
-            status=Question.Status.APPROVED
-        ).exclude(
-            id__in=selected_ids
-        )
-
-        ranked_questions = rank_questions_for_student(
-            user,
-            topic_queryset
-        )
-
-        exact_questions = ranked_questions[
-            :rule.question_count
-        ]
-
-        selected_by_rule[rule.id] = list(exact_questions)
-
-        selected_ids.update(
-            question.id
-            for question in exact_questions
-        )
-
-    # --------------------------------------------------
-    # Pass 2: Fill topic shortages
-    # --------------------------------------------------
-
-    for rule in topic_rules:
-        topic = rule.topic
-        required = rule.question_count
-
-        selected_for_rule = selected_by_rule[rule.id]
-
-        exact_count = len(selected_for_rule)
-        domain_fallback_count = 0
-        course_fallback_count = 0
-
-        shortage = required - len(selected_for_rule)
-
-        # Same-domain fallback
-        if shortage > 0:
-            domain_queryset = Question.objects.filter(
-                topic__domain=topic.domain,
-                is_active=True,
-                status=Question.Status.APPROVED
-            ).exclude(
-                id__in=selected_ids
-            )
-
-            domain_candidates = rank_questions_for_student(
-                user,
-                domain_queryset
-            )
-
-            domain_fallback = domain_candidates[:shortage]
-
-            selected_for_rule.extend(domain_fallback)
-
-            selected_ids.update(
-                question.id
-                for question in domain_fallback
-            )
-
-            domain_fallback_count = len(domain_fallback)
-            shortage = required - len(selected_for_rule)
-
-        # Whole-course fallback
-        if shortage > 0:
-            course_queryset = Question.objects.filter(
-                topic__domain__course=blueprint.course,
-                is_active=True,
-                status=Question.Status.APPROVED
-            ).exclude(
-                id__in=selected_ids
-            )
-
-            course_candidates = rank_questions_for_student(
-                user,
-                course_queryset
-            )
-
-            course_fallback = course_candidates[:shortage]
-
-            selected_for_rule.extend(course_fallback)
-
-            selected_ids.update(
-                question.id
-                for question in course_fallback
-            )
-
-            course_fallback_count = len(course_fallback)
-            shortage = required - len(selected_for_rule)
-
-        if shortage > 0:
-            raise ValueError(
-                f"Could not allocate enough questions for "
-                f"topic '{topic.name}'. "
-                f"Required: {required}, "
-                f"selected: {len(selected_for_rule)}."
-            )
-
-        if domain_fallback_count or course_fallback_count:
-            warnings.append(
-                {
-                    "topic": topic.name,
-                    "domain": topic.domain.name,
-                    "required": required,
-                    "exact_topic_questions": exact_count,
-                    "domain_fallback_questions": domain_fallback_count,
-                    "course_fallback_questions": course_fallback_count,
-                }
-            )
-
-        allocation_report.append(
-            {
-                "domain": topic.domain.name,
-                "topic": topic.name,
-                "required": required,
-                "exact_topic_questions": exact_count,
-                "domain_fallback_questions": domain_fallback_count,
-                "course_fallback_questions": course_fallback_count,
-                "selected_total": len(selected_for_rule),
-            }
-        )
-
-    selected_questions = []
-
-    for rule in topic_rules:
-        selected_questions.extend(
-            selected_by_rule[rule.id]
-        )
-
-    if len(selected_questions) != blueprint.total_questions:
-        raise ValueError(
-            f"Blueprint generated {len(selected_questions)} "
-            f"questions instead of "
-            f"{blueprint.total_questions}."
-        )
-
-    random.shuffle(selected_questions)
-
-    return selected_questions, allocation_report, warnings
-
 
 # --------------------------------------------------
 # Basic CRUD ViewSets
@@ -904,6 +369,13 @@ class CourseViewSet(viewsets.ModelViewSet):
                 teacher=user
             ).values_list("course_id", flat=True)
             return queryset.filter(id__in=assigned_course_ids)
+
+        # Students see only their department's courses
+        if is_student_user(user):
+            department = get_user_department(user)
+            if department:
+                return queryset.filter(department=department)
+            return queryset.none()
 
         if user.is_staff:
             return queryset
@@ -1101,6 +573,13 @@ class DomainViewSet(viewsets.ModelViewSet):
             ).values_list("course_id", flat=True)
             return queryset.filter(course_id__in=assigned_course_ids)
 
+        # Students see only domains from their department's courses
+        if is_student_user(user):
+            department = get_user_department(user)
+            if department:
+                return queryset.filter(course__department=department)
+            return queryset.none()
+
         if user.is_staff:
             return queryset
 
@@ -1161,6 +640,13 @@ class TopicViewSet(viewsets.ModelViewSet):
             ).values_list("course_id", flat=True)
             return queryset.filter(domain__course_id__in=assigned_course_ids)
 
+        # Students see only topics from their department's courses
+        if is_student_user(user):
+            department = get_user_department(user)
+            if department:
+                return queryset.filter(domain__course__department=department)
+            return queryset.none()
+
         if user.is_staff:
             return queryset
 
@@ -1208,9 +694,13 @@ class QuestionViewSet(viewsets.ModelViewSet):
         ).prefetch_related("choices")
 
         if is_student_user(user):
+            department = get_user_department(user)
+            if not department:
+                return queryset.none()
             return queryset.filter(
                 is_active=True,
-                status=Question.Status.APPROVED
+                status=Question.Status.APPROVED,
+                topic__domain__course__department=department,
             )
 
         if is_teacher_user(user):
@@ -1727,11 +1217,32 @@ class ExamBlueprintViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if is_admin_user(user):
-            return ExamBlueprint.objects.select_related(
-                "course", "created_by"
-            ).prefetch_related("domain_rules").order_by("-created_at")
-        return ExamBlueprint.objects.filter(is_active=True).order_by("-created_at")
+        queryset = ExamBlueprint.objects.select_related(
+            "course",
+            "course__department",
+            "created_by"
+        ).prefetch_related("domain_rules").order_by("-created_at")
+
+        if is_system_admin_user(user) or (user.is_staff and not is_department_head_user(user)):
+            return queryset
+
+        if is_department_head_user(user):
+            department = get_user_department(user)
+            if department:
+                return queryset.filter(course__department=department)
+            return queryset.none()
+
+        # Students see only active blueprints from their department
+        if is_student_user(user):
+            department = get_user_department(user)
+            if department:
+                return queryset.filter(
+                    course__department=department,
+                    is_active=True
+                )
+            return queryset.none()
+
+        return queryset.filter(is_active=True)
 
     def perform_create(self, serializer):
         blueprint = serializer.save(created_by=self.request.user)
@@ -1794,6 +1305,8 @@ def generate_mock_exam(request):
 
     blueprint_id = request.data.get("blueprint_id")
     course_id = request.data.get("course_id")
+    topic_id = request.data.get("topic_id")
+    topic_param = request.data.get("topic")
 
     selected_questions = []
     course = None
@@ -1805,8 +1318,43 @@ def generate_mock_exam(request):
     warnings = []
 
     try:
+        # Topic mode: 5-question Mini Mock for Adaptive Learning Engine
+        if topic_id or topic_param:
+            topic_obj = None
+            if topic_id:
+                topic_obj = Topic.objects.filter(id=topic_id).first()
+            if not topic_obj and topic_param:
+                topic_obj = Topic.objects.filter(name=topic_param).first()
+
+            if not topic_obj:
+                return Response(
+                    {"detail": "Topic not found for mini mock."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            user_department = get_user_department(user)
+            if (
+                not user_department
+                or topic_obj.domain.course.department_id != user_department.id
+            ):
+                return Response(
+                    {"detail": "This topic is not available for your department."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            course = topic_obj.domain.course
+            exam_title = f"Mini Mock - {topic_obj.name}"
+            mode = "topic"
+            total_questions = int(request.data.get("total_questions", 5))
+
+            selected_questions = select_questions_for_topic(
+                user=user,
+                topic=topic_obj,
+                count=total_questions
+            )
+
         # Blueprint mode: official-style Exit Exam simulation
-        if blueprint_id:
+        elif blueprint_id:
             try:
                 blueprint = ExamBlueprint.objects.get(
                     id=blueprint_id,
@@ -1816,6 +1364,16 @@ def generate_mock_exam(request):
                 return Response(
                     {"detail": "Active exam blueprint not found."},
                     status=status.HTTP_404_NOT_FOUND
+                )
+
+            user_department = get_user_department(user)
+            if (
+                not user_department
+                or blueprint.course.department_id != user_department.id
+            ):
+                return Response(
+                    {"detail": "This blueprint is not available for your department."},
+                    status=status.HTTP_403_FORBIDDEN
                 )
 
             course = blueprint.course
@@ -1834,7 +1392,7 @@ def generate_mock_exam(request):
         else:
             if not course_id:
                 return Response(
-                    {"detail": "course_id or blueprint_id is required."},
+                    {"detail": "course_id, topic_id/topic, or blueprint_id is required."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1844,6 +1402,16 @@ def generate_mock_exam(request):
                 return Response(
                     {"detail": "Course not found."},
                     status=status.HTTP_404_NOT_FOUND
+                )
+
+            user_department = get_user_department(user)
+            if (
+                not user_department
+                or course.department_id != user_department.id
+            ):
+                return Response(
+                    {"detail": "This course is not available for your department."},
+                    status=status.HTTP_403_FORBIDDEN
                 )
 
             total_questions = int(request.data.get("total_questions", 5))
@@ -3471,7 +3039,14 @@ def question_availability_by_domain(request):
 
     course_id = request.query_params.get("course_id")
 
-    domains = Domain.objects.all()
+    domains = Domain.objects.select_related("course", "course__department")
+
+    if is_department_head_user(user) and not is_system_admin_user(user):
+        department = get_user_department(user)
+        if department:
+            domains = domains.filter(course__department=department)
+        else:
+            domains = domains.none()
 
     if course_id:
         domains = domains.filter(course_id=course_id)
@@ -3962,6 +3537,9 @@ def system_settings(request):
             "default_passing_score",
             "default_exam_duration_minutes",
             "max_battle_participants",
+            "mastery_threshold_accuracy",
+            "mastery_minimum_attempts",
+            "quiz_unlock_score",
         ]:
             if field in request.data:
                 setattr(settings_obj, field, int(request.data[field]))
@@ -3981,13 +3559,36 @@ def system_settings(request):
         "default_passing_score": settings_obj.default_passing_score,
         "default_exam_duration_minutes": settings_obj.default_exam_duration_minutes,
         "max_battle_participants": settings_obj.max_battle_participants,
+        "mastery_threshold_accuracy": settings_obj.mastery_threshold_accuracy,
+        "mastery_minimum_attempts": settings_obj.mastery_minimum_attempts,
+        "quiz_unlock_score": settings_obj.quiz_unlock_score,
         "updated_at": settings_obj.updated_at,
     })
 
 
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 @permission_classes([IsSystemAdminOnly])
 def list_users(request):
+    if request.method == "POST":
+        from users.serializers import AdminUserSerializer
+        serializer = AdminUserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        AuditLog.objects.create(
+            user=request.user,
+            action=AuditLog.Action.CREATED,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "department_id": user.department_id,
+            },
+            description=f"System admin {request.user.username} created user {user.username} with role {user.role}.",
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     User = get_user_model()
     qs = User.objects.all().select_related("department")
     role = request.query_params.get("role")
@@ -4028,8 +3629,125 @@ def list_users(request):
             "department_id": u.department_id,
             "is_active": u.is_active,
             "date_joined": u.date_joined,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
         } for u in users_slice]
     })
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsSystemAdminOnly])
+def admin_user_detail(request, user_id):
+    from users.serializers import AdminUserSerializer
+    User = get_user_model()
+    try:
+        target = User.objects.select_related("department").get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        serializer = AdminUserSerializer(target)
+        return Response(serializer.data)
+
+    if request.method == "PATCH":
+        serializer = AdminUserSerializer(target, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        AuditLog.objects.create(
+            user=request.user,
+            action=AuditLog.Action.UPDATED,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "department_id": user.department_id,
+            },
+            description=f"System admin {request.user.username} updated user {user.username}.",
+        )
+        return Response(serializer.data)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsDepartmentHeadOrSystemAdmin])
+def list_department_teachers(request):
+    from users.serializers import AdminUserSerializer
+    User = get_user_model()
+    user = request.user
+
+    if request.method == "POST":
+        if not (is_department_head_user(user) or is_system_admin_user(user) or user.is_staff):
+            return Response(
+                {"detail": "Only department heads and system admins can create teachers."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = request.data.copy()
+        data["role"] = "teacher"
+
+        if is_department_head_user(user) and not is_system_admin_user(user):
+            department = get_user_department(user)
+            if not department:
+                return Response(
+                    {"detail": "Department head has no department assigned."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            data["department"] = department.id
+
+        serializer = AdminUserSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        new_teacher = serializer.save()
+
+        AuditLog.objects.create(
+            user=request.user,
+            action=AuditLog.Action.CREATED,
+            entity_type="user",
+            entity_id=new_teacher.id,
+            new_value={
+                "username": new_teacher.username,
+                "email": new_teacher.email,
+                "role": "teacher",
+                "department_id": new_teacher.department_id,
+            },
+            description=f"{user.username} created teacher {new_teacher.username}.",
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    if is_system_admin_user(user):
+        qs = User.objects.filter(role="teacher").select_related("department")
+    elif is_department_head_user(user):
+        department = get_user_department(user)
+        if not department:
+            return Response([], status=status.HTTP_200_OK)
+        qs = User.objects.filter(
+            role="teacher",
+            department=department
+        ).select_related("department")
+    elif user.is_staff:
+        qs = User.objects.filter(role="teacher").select_related("department")
+    else:
+        qs = User.objects.none()
+
+    search = request.query_params.get("search")
+    if search:
+        qs = qs.filter(
+            Q(username__icontains=search) |
+            Q(email__icontains=search) |
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search)
+        )
+
+    qs = qs.order_by("username")
+
+    return Response([{
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "department": u.department.name if u.department else None,
+        "department_id": u.department_id,
+        "is_active": u.is_active,
+    } for u in qs])
 
 
 @api_view(["POST"])
@@ -4107,13 +3825,24 @@ def admin_reset_password(request, user_id):
     return Response({"message": f"Password reset for {target.username}."})
 
 
-@api_view(["PATCH", "DELETE"])
+@api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsSystemAdminOnly])
 def admin_department_detail(request, pk):
     try:
         dept = Department.objects.annotate(course_count=Count("courses")).get(pk=pk)
     except Department.DoesNotExist:
         return Response({"error": "Department not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        serializer = DepartmentSerializer(dept)
+        dept_data = serializer.data
+        dept_data["head_count"] = get_user_model().objects.filter(
+            role="department_head", department=dept
+        ).count()
+        dept_data["teacher_count"] = get_user_model().objects.filter(
+            role="teacher", department=dept
+        ).count()
+        return Response(dept_data)
 
     if request.method == "PATCH":
         serializer = DepartmentSerializer(dept, data=request.data, partial=True)
@@ -4169,4 +3898,3 @@ def admin_audit_log_list(request):
         },
         status=status.HTTP_200_OK
     )
-

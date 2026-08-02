@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { normalizeRole } from "../routes/roleRoutes";
+import { normalizeRole, getDefaultPathForRole } from "../routes/roleRoutes";
 import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
@@ -18,10 +18,13 @@ const Navbar = () => {
   const isDepartmentHead = normalizedRole === "department_head";
   const isSystemAdmin = normalizedRole === "system_admin";
 
+  const brandTo =
+    user && normalizedRole ? getDefaultPathForRole(normalizedRole) : "/";
+
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
       <div className="container">
-        <Link className="navbar-brand fw-bold text-primary" to="/">
+        <Link className="navbar-brand fw-bold text-primary" to={brandTo}>
           UniPrep AI
         </Link>
 

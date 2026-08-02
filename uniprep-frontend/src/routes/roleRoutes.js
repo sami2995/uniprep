@@ -28,6 +28,8 @@ export const SIDEBAR_LINKS = {
     { label: "Results", path: "/student/results", icon: "BarChart3" },
     { label: "Materials", path: "/student/materials", icon: "BookOpen" },
     { label: "Focus", path: "/student/focus", icon: "Timer" },
+    { label: "Adaptive Learning Engine", path: "/student/learning", icon: "Brain" },
+    { label: "Battle", path: "/student/battle", icon: "Zap" },
   ],
   [ROLES.TEACHER]: [
     { label: "Dashboard", path: "/teacher/dashboard", icon: "Home" },

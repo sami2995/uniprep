@@ -7,6 +7,9 @@ const SystemSettingsPage = () => {
     default_passing_score: 50,
     default_exam_duration_minutes: 60,
     max_battle_participants: 8,
+    mastery_threshold_accuracy: 80,
+    mastery_minimum_attempts: 3,
+    quiz_unlock_score: 70,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,6 +30,9 @@ const SystemSettingsPage = () => {
         default_passing_score: response.data.default_passing_score,
         default_exam_duration_minutes: response.data.default_exam_duration_minutes,
         max_battle_participants: response.data.max_battle_participants,
+        mastery_threshold_accuracy: response.data.mastery_threshold_accuracy ?? 80,
+        mastery_minimum_attempts: response.data.mastery_minimum_attempts ?? 3,
+        quiz_unlock_score: response.data.quiz_unlock_score ?? 70,
       });
       setUpdatedAt(response.data.updated_at);
     } catch (err) {
@@ -47,12 +53,18 @@ const SystemSettingsPage = () => {
         default_passing_score: Number(settings.default_passing_score),
         default_exam_duration_minutes: Number(settings.default_exam_duration_minutes),
         max_battle_participants: Number(settings.max_battle_participants),
+        mastery_threshold_accuracy: Number(settings.mastery_threshold_accuracy),
+        mastery_minimum_attempts: Number(settings.mastery_minimum_attempts),
+        quiz_unlock_score: Number(settings.quiz_unlock_score),
       });
 
       setSettings({
         default_passing_score: response.data.default_passing_score,
         default_exam_duration_minutes: response.data.default_exam_duration_minutes,
         max_battle_participants: response.data.max_battle_participants,
+        mastery_threshold_accuracy: response.data.mastery_threshold_accuracy ?? 80,
+        mastery_minimum_attempts: response.data.mastery_minimum_attempts ?? 3,
+        quiz_unlock_score: response.data.quiz_unlock_score ?? 70,
       });
       setUpdatedAt(response.data.updated_at);
       setSuccess("System settings updated successfully.");
@@ -166,6 +178,72 @@ const SystemSettingsPage = () => {
                     />
                     <small className="form-text text-muted">
                       Maximum number of student participants allowed in a multi-player battle room.
+                    </small>
+                  </div>
+
+                  <hr className="my-4" />
+                  <h6 className="fw-bold text-primary mb-3">Adaptive Learning Engine Thresholds</h6>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-medium">Mastery Threshold Accuracy (%)</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-lg rounded-3"
+                      min="1"
+                      max="100"
+                      value={settings.mastery_threshold_accuracy}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          mastery_threshold_accuracy: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                    <small className="form-text text-muted">
+                      Minimum accuracy required to consider a topic mastered in adaptive topic selection.
+                    </small>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-medium">Mastery Minimum Attempts</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-lg rounded-3"
+                      min="1"
+                      max="50"
+                      value={settings.mastery_minimum_attempts}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          mastery_minimum_attempts: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                    <small className="form-text text-muted">
+                      Minimum number of total question attempts required before mastery accuracy threshold is applied.
+                    </small>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-medium">Quiz Unlock Score (%)</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-lg rounded-3"
+                      min="1"
+                      max="100"
+                      value={settings.quiz_unlock_score}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          quiz_unlock_score: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                    <small className="form-text text-muted">
+                      Score needed on the Quiz step of a learning path to unlock the Mini Mock step.
                     </small>
                   </div>
 

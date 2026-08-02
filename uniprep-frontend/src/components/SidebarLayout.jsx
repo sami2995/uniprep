@@ -3,6 +3,7 @@ import {
   Archive,
   BarChart3,
   BookOpen,
+  Brain,
   Building2,
   CheckSquare,
   CircleHelp,
@@ -16,10 +17,11 @@ import {
   Timer,
   UserCheck,
   Users,
+  Zap,
 } from "lucide-react";
 
 import { useAuth } from "../auth/AuthContext";
-import { SIDEBAR_LINKS, normalizeRole } from "../routes/roleRoutes";
+import { SIDEBAR_LINKS, normalizeRole, getDefaultPathForRole } from "../routes/roleRoutes";
 import NotificationBell from "./NotificationBell";
 import ProfileDropdown from "./ProfileDropdown";
 
@@ -27,6 +29,7 @@ const ICONS = {
   Archive,
   BarChart3,
   BookOpen,
+  Brain,
   Building2,
   CheckSquare,
   CircleHelp,
@@ -40,6 +43,7 @@ const ICONS = {
   Timer,
   UserCheck,
   Users,
+  Zap,
 };
 
 const PORTAL_LABELS = {
@@ -64,7 +68,7 @@ const SidebarLayout = ({ children }) => {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <Link to="/" className="sidebar-logo">
+        <Link to={getDefaultPathForRole(role)} className="sidebar-logo">
           <span className="sidebar-logo-icon">U</span>
           <div>
             <strong>UniPrep AI</strong>

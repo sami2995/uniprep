@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/admin/", include("exit_exams.admin_urls")),
     path("api/exit-exams/", include("exit_exams.urls")),
     path("api/analytics/", include("analytics.urls")),
+    path("api/adaptive-learning/", include("analytics.adaptive_urls")),
     path("api/rag/", include("rag.urls")),
     path("api/collaboration/", include("collaboration.urls")),
 

@@ -46,3 +46,30 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["student", "created_at"]
+
+
+from .models import LearningPath, LearningStep
+
+
+class LearningStepSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearningStep
+        fields = ["step_type", "completed", "completed_at", "score"]
+
+
+class LearningPathSerializer(serializers.ModelSerializer):
+    steps = LearningStepSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = LearningPath
+        fields = [
+            "id",
+            "topic",
+            "subtopic",
+            "priority",
+            "status",
+            "current_step",
+            "steps",
+            "created_at",
+            "completed_at",
+        ]

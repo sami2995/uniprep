@@ -424,9 +424,14 @@ class SpacedRepetitionQueueViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        base_qs = SpacedRepetitionQueue.objects.select_related("question")
         if user.is_staff or user.role in ADMIN_ROLES:
-            return SpacedRepetitionQueue.objects.all()
-        return SpacedRepetitionQueue.objects.filter(student=user)
+            return base_qs.all()
+        return base_qs.filter(
+            student=user,
+            question__status=Question.Status.APPROVED,
+            question__is_active=True
+        )
 
 
 class ReadinessScoreViewSet(viewsets.ModelViewSet):
@@ -511,9 +516,11 @@ def get_recommendation_priority_v2(accuracy, trend_direction="stable"):
 
 
 def trigger_spaced_repetition_for_high_priority(user, topic):
-    q = Question.objects.filter(topic=topic, status=Question.Status.APPROVED).first()
-    if not q:
-        q = Question.objects.filter(topic=topic).first()
+    q = Question.objects.filter(
+        topic=topic,
+        status=Question.Status.APPROVED,
+        is_active=True
+    ).first()
 
     if q:
         SpacedRepetitionQueue.objects.get_or_create(
@@ -930,11 +937,13 @@ def student_dashboard(request):
         if avg_acc < 60:
             weak_domains_data.append(d_data)
 
-    # Spaced repetition due today or earlier
+    # Spaced repetition due today or earlier (approved active questions only)
     due_reviews = SpacedRepetitionQueue.objects.filter(
         student=user,
         is_active=True,
-        next_review_date__lte=timezone.now().date()
+        next_review_date__lte=timezone.now().date(),
+        question__status=Question.Status.APPROVED,
+        question__is_active=True
     ).select_related("question", "topic")
 
     # Focus / productivity summary

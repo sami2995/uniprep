@@ -8,6 +8,7 @@ const TakeExam = () => {
   const navigate = useNavigate();
 
   const mockExam = location.state?.mockExam;
+  const returnTo = location.state?.returnTo;
 
   const [answers, setAnswers] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -177,7 +178,11 @@ const TakeExam = () => {
         answers: formattedAnswers,
       });
 
-      navigate(`/student/results/${response.data.attempt_id}`);
+      if (returnTo) {
+        navigate(returnTo);
+      } else {
+        navigate(`/student/results/${response.data.attempt_id}`);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to submit exam.");
     } finally {

@@ -60,6 +60,9 @@ class Notification(models.Model):
         BATTLE_INVITE = "battle_invite", "Battle Invite"
         MATERIAL_UPLOADED = "material_uploaded", "Material Uploaded"
         WEEKLY_REMINDER = "weekly_reminder", "Weekly Reminder"
+        LEARNING_PATH_READY = "learning_path_ready", "Learning Path Ready"
+        LEARNING_STEP_UNLOCKED = "learning_step_unlocked", "Learning Step Unlocked"
+        LEARNING_PATH_COMPLETED = "learning_path_completed", "Learning Path Completed"
 
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -172,3 +175,63 @@ class FocusSession(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.duration_minutes} minutes"
+
+
+class LearningPath(models.Model):
+    STATUS_CHOICES = [
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('abandoned', 'Abandoned'),
+    ]
+    PRIORITY_CHOICES = [
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+    ]
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_paths"
+    )
+    topic = models.CharField(max_length=150)
+    subtopic = models.CharField(max_length=150, blank=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='in_progress')
+    current_step = models.CharField(max_length=15, default='summary')  # summary|flashcards|quiz|mini_mock|scheduled
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["student", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student.username} - {self.topic} ({self.status})"
+
+
+class LearningStep(models.Model):
+    STEP_TYPES = [
+        ('summary', 'Summary'),
+        ('flashcards', 'Flashcards'),
+        ('quiz', 'Quiz'),
+        ('mini_mock', 'Mini Mock'),
+    ]
+
+    learning_path = models.ForeignKey(
+        LearningPath,
+        related_name='steps',
+        on_delete=models.CASCADE
+    )
+    step_type = models.CharField(max_length=15, choices=STEP_TYPES)
+    completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    score = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.learning_path.topic} - {self.step_type} ({'Done' if self.completed else 'Pending'})"

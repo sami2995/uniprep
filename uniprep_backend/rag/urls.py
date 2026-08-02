@@ -14,7 +14,9 @@ from .views import (
     generate_material_summary,
     ask_material_question,
     generate_material_flashcards,
-    generate_material_quiz
+    generate_material_quiz,
+    get_material_quiz,
+    get_material_chat
 )
 
 
@@ -45,19 +47,29 @@ urlpatterns = [
         name="generate-material-summary"
     ),
     path(
-    "materials/<int:material_id>/ask/",
-    ask_material_question,
-    name="ask-material-question"
-),
-path(
-    "materials/<int:material_id>/flashcards/",
-    generate_material_flashcards,
-    name="generate-material-flashcards"
-),
-path(
-    "materials/<int:material_id>/generate-quiz/",
-    generate_material_quiz,
-    name="generate-material-quiz"
-),
+        "materials/<int:material_id>/ask/",
+        ask_material_question,
+        name="ask-material-question"
+    ),
+    path(
+        "materials/<int:material_id>/flashcards/",
+        generate_material_flashcards,
+        name="generate-material-flashcards"
+    ),
+    path(
+        "materials/<int:material_id>/generate-quiz/",
+        generate_material_quiz,
+        name="generate-material-quiz"
+    ),
+    path(
+        "materials/<int:material_id>/quiz/",
+        get_material_quiz,
+        name="get-material-quiz"
+    ),
+    path(
+        "materials/<int:material_id>/chat/",
+        get_material_chat,
+        name="get-material-chat"
+    ),
     path("", include(router.urls)),
 ]

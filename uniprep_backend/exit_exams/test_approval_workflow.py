@@ -15,6 +15,7 @@ from .models import (
     Course,
     Domain,
     Topic,
+    ExamBlueprint,
     ExtractedQuestion,
     ExamPdfImport,
     TeacherCourseAssignment,
@@ -345,6 +346,32 @@ class DepartmentHeadScopingTests(TestCase):
             course=self.course_ee
         )
 
+        # Approved questions and blueprints for endpoint scoping regressions
+        self.question_cs = Question.objects.create(
+            topic=self.topic_cs,
+            text="CS approved question",
+            created_by=self.teacher_cs,
+            status=Question.Status.APPROVED,
+            is_active=True,
+        )
+        self.question_ee = Question.objects.create(
+            topic=self.topic_ee,
+            text="EE approved question",
+            created_by=self.teacher_ee,
+            status=Question.Status.APPROVED,
+            is_active=True,
+        )
+        self.blueprint_cs = ExamBlueprint.objects.create(
+            course=self.course_cs,
+            title="CS Blueprint",
+            total_questions=1,
+        )
+        self.blueprint_ee = ExamBlueprint.objects.create(
+            course=self.course_ee,
+            title="EE Blueprint",
+            total_questions=1,
+        )
+
     def test_department_head_course_scoping(self):
         """Dept Head CS should see only CS course and fail to update or delete EE course."""
         self.client.force_authenticate(user=self.dh_cs)
@@ -454,6 +481,55 @@ class DepartmentHeadScopingTests(TestCase):
             {"teacher": self.teacher_cs.id, "course": self.course_cs.id}
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_department_head_question_availability_scoped_to_department(self):
+        """Dept Head CS should see only CS domain availability, not EE."""
+        self.client.force_authenticate(user=self.dh_cs)
+
+        response = self.client.get("/api/exit-exams/question-availability/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        domain_ids = [item["domain_id"] for item in response.data["availability"]]
+        self.assertIn(self.domain_cs.id, domain_ids)
+        self.assertNotIn(self.domain_ee.id, domain_ids)
+
+    def test_department_head_question_availability_preserves_course_filter_within_scope(self):
+        """Dept Head CS course filter should not expose another department's domain."""
+        self.client.force_authenticate(user=self.dh_cs)
+
+        response = self.client.get(
+            f"/api/exit-exams/question-availability/?course_id={self.course_ee.id}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["availability"], [])
+
+    def test_department_head_blueprints_scoped_to_department(self):
+        """Dept Head CS should see only CS blueprints, not EE."""
+        self.client.force_authenticate(user=self.dh_cs)
+
+        response = self.client.get("/api/exit-exams/exam-blueprints/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        blueprint_ids = [item["id"] for item in response.data]
+        self.assertIn(self.blueprint_cs.id, blueprint_ids)
+        self.assertNotIn(self.blueprint_ee.id, blueprint_ids)
+
+    def test_system_admin_keeps_global_question_availability_and_blueprint_access(self):
+        """System Admin should still see data across departments for these endpoints."""
+        self.client.force_authenticate(user=self.sys_admin)
+
+        availability_response = self.client.get("/api/exit-exams/question-availability/")
+        blueprint_response = self.client.get("/api/exit-exams/exam-blueprints/")
+
+        self.assertEqual(availability_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(blueprint_response.status_code, status.HTTP_200_OK)
+        domain_ids = [item["domain_id"] for item in availability_response.data["availability"]]
+        blueprint_ids = [item["id"] for item in blueprint_response.data]
+        self.assertIn(self.domain_cs.id, domain_ids)
+        self.assertIn(self.domain_ee.id, domain_ids)
+        self.assertIn(self.blueprint_cs.id, blueprint_ids)
+        self.assertIn(self.blueprint_ee.id, blueprint_ids)
 
 
 class TeacherMCQChoiceWorkflowTests(TestCase):

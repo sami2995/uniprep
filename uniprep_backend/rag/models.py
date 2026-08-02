@@ -15,6 +15,10 @@ class StudyMaterial(models.Model):
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
 
+    class PublishStatus(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PUBLISHED = "published", "Published"
+
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -67,6 +71,13 @@ class StudyMaterial(models.Model):
     )
 
     error_message = models.TextField(blank=True)
+
+    publish_status = models.CharField(
+        max_length=20,
+        choices=PublishStatus.choices,
+        default=PublishStatus.DRAFT
+    )
+
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

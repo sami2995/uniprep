@@ -51,6 +51,14 @@ from .services.ai_service import (
 ADMIN_ROLES = {"department_head", "system_admin", "admin"}
 
 
+def invalidate_material_artifacts(material):
+    """Hard-invalidates all generated artifacts when a material is re-chunked."""
+    MaterialSummary.objects.filter(material=material).delete()
+    GeneratedFlashcard.objects.filter(material=material).delete()
+    GeneratedQuiz.objects.filter(material=material).delete()
+    AIChatSession.objects.filter(material=material).delete()
+
+
 def create_fallback_flashcards_from_chunks(chunks, count=5):
     flashcards = []
 
@@ -276,6 +284,7 @@ def process_study_material(request, material_id):
 
         with transaction.atomic():
             DocumentChunk.objects.filter(material=material).delete()
+            invalidate_material_artifacts(material)
 
             for index, chunk in enumerate(chunks, start=1):
                 point_id = generate_local_chunk_id()
@@ -334,7 +343,7 @@ def process_study_material(request, material_id):
         )
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def generate_material_summary(request, material_id):
     user = request.user
@@ -350,6 +359,13 @@ def generate_material_summary(request, material_id):
             {"detail": "Study material not found."},
             status=status.HTTP_404_NOT_FOUND,
         )
+
+    if request.method == "GET":
+        summary = MaterialSummary.objects.filter(material=material).first()
+        if summary:
+            serializer = MaterialSummarySerializer(summary)
+            return Response({"summary": serializer.data}, status=status.HTTP_200_OK)
+        return Response({"summary": None}, status=status.HTTP_200_OK)
 
     if material.processing_status != StudyMaterial.ProcessingStatus.COMPLETED:
         return Response(
@@ -505,10 +521,10 @@ def ask_material_question(request, material_id):
             ai_status = "fallback_from_retrieved_chunks"
             ai_error = str(ai_exception)
 
-        session = AIChatSession.objects.create(
+        session, _ = AIChatSession.objects.get_or_create(
             student=user,
             material=material,
-            title=f"Chat about {material.title}"
+            defaults={"title": f"Chat about {material.title}"}
         )
 
         AIChatMessage.objects.create(
@@ -545,7 +561,7 @@ def ask_material_question(request, material_id):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def generate_material_flashcards(request, material_id):
     user = request.user
@@ -560,6 +576,17 @@ def generate_material_flashcards(request, material_id):
         return Response(
             {"detail": "Study material not found."},
             status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        flashcards = GeneratedFlashcard.objects.filter(
+            student=user,
+            material=material
+        ).order_by("-created_at")
+        serializer = GeneratedFlashcardSerializer(flashcards, many=True)
+        return Response(
+            {"flashcards": serializer.data},
+            status=status.HTTP_200_OK
         )
 
     if material.processing_status != StudyMaterial.ProcessingStatus.COMPLETED:
@@ -743,3 +770,64 @@ def generate_material_quiz(request, material_id):
         },
         status=status.HTTP_200_OK
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_material_quiz(request, material_id):
+    user = request.user
+
+    try:
+        if user.is_staff or user.role in ADMIN_ROLES:
+            material = StudyMaterial.objects.get(id=material_id)
+        else:
+            material = StudyMaterial.objects.get(id=material_id, owner=user)
+
+    except StudyMaterial.DoesNotExist:
+        return Response(
+            {"detail": "Study material not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    quiz = GeneratedQuiz.objects.filter(
+        student=user,
+        material=material
+    ).order_by("-created_at").first()
+
+    if quiz:
+        serializer = GeneratedQuizSerializer(quiz)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    return Response({"quiz": None}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_material_chat(request, material_id):
+    user = request.user
+
+    try:
+        if user.is_staff or user.role in ADMIN_ROLES:
+            material = StudyMaterial.objects.get(id=material_id)
+        else:
+            material = StudyMaterial.objects.get(id=material_id, owner=user)
+
+    except StudyMaterial.DoesNotExist:
+        return Response(
+            {"detail": "Study material not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    session = AIChatSession.objects.filter(
+        student=user,
+        material=material
+    ).order_by("-created_at").first()
+
+    if session:
+        messages = [
+            {"role": message.sender, "text": message.message}
+            for message in session.messages.all()
+        ]
+        return Response({"messages": messages}, status=status.HTTP_200_OK)
+
+    return Response({"messages": []}, status=status.HTTP_200_OK)

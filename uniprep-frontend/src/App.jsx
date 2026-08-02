@@ -22,7 +22,10 @@ import Results from "./pages/Results";
 import ResultDetail from "./pages/ResultDetail";
 import StudentMaterials from "./pages/StudentMaterials";
 import StudyMaterialDetail from "./pages/StudyMaterialDetail";
+import TeacherMaterials from "./pages/TeacherMaterials";
+import TeacherMaterialDetail from "./pages/TeacherMaterialDetail";
 import StudentFocus from "./pages/StudentFocus";
+import AdaptiveLearningPage from "./pages/AdaptiveLearningPage";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminAcademic from "./pages/AdminAcademic";
@@ -222,6 +225,15 @@ function App() {
             </StudentLayout>
           }
         />
+
+        <Route
+          path="/student/learning"
+          element={
+            <StudentLayout>
+              <AdaptiveLearningPage />
+            </StudentLayout>
+          }
+        />
         <Route
   path="/student/battle"
   element={
@@ -319,7 +331,7 @@ function App() {
           path="/teacher/materials"
           element={
             <RoleLayout roles={[ROLES.TEACHER]}>
-              <StudentMaterials />
+              <TeacherMaterials />
             </RoleLayout>
           }
         />
@@ -328,7 +340,7 @@ function App() {
           path="/teacher/materials/:materialId"
           element={
             <RoleLayout roles={[ROLES.TEACHER]}>
-              <StudyMaterialDetail />
+              <TeacherMaterialDetail />
             </RoleLayout>
           }
         />
