@@ -10,6 +10,9 @@ from rest_framework.response import Response
 
 from exit_exams.models import Course, Question, Choice
 
+from analytics.notification_service import notify_user
+from analytics.models import Notification
+
 from .models import (
     QuizChallenge,
     ChallengeParticipant,
@@ -183,6 +186,15 @@ def join_challenge(request):
         student=user,
         defaults={"is_creator": False}
     )
+
+    if created and not participant.is_creator and challenge.created_by_id != user.id:
+        notify_user(
+            challenge.created_by,
+            title=f"New Challenger Joined: {challenge.title}",
+            message=f"{user.username} joined your quiz challenge room {challenge.room_code}.",
+            notification_type=Notification.NotificationType.BATTLE_INVITE,
+            target_url=f"/student/battle/{challenge.room_code}/lobby",
+        )
 
     return Response(
         {

@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from analytics.views import (
     notifications,
     mark_notification_read,
+    mark_all_notifications_read,
     unread_notification_count,
 )
 
@@ -29,6 +30,11 @@ urlpatterns = [
         "api/notifications/read/<int:notification_id>/",
         mark_notification_read,
         name="mark-notification-read",
+    ),
+    path(
+        "api/notifications/read-all/",
+        mark_all_notifications_read,
+        name="mark-all-notifications-read",
     ),
     path(
         "api/notifications/unread-count/",

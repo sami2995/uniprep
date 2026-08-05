@@ -10,6 +10,7 @@ from analytics.models import (
     ReadinessScore,
     Notification
 )
+from analytics.notification_service import notify_user
 from analytics.services import calculate_readiness_score, update_topic_performance, add_wrong_question_to_spaced_repetition
 
 
@@ -115,11 +116,12 @@ def generate_learning_path(student):
             completed=False
         )
 
-    Notification.objects.create(
-        student=student,
+    notify_user(
+        student,
         title=f"New Learning Path: {topic_name}",
         message=f"Your personalized learning path for {topic_name} is ready.",
-        notification_type=Notification.NotificationType.LEARNING_PATH_READY
+        notification_type=Notification.NotificationType.LEARNING_PATH_READY,
+        target_url="/student/learning",
     )
 
     return path
@@ -155,12 +157,13 @@ def complete_step(learning_path, step_type, score=None):
         learning_path.current_step = 'mini_mock'
         learning_path.save()
 
-        Notification.objects.create(
-            student=learning_path.student,
-            title=f"Mini Mock Unlocked: {learning_path.topic}",
-            message=f"Congratulations! You unlocked the Mini Mock step for {learning_path.topic}.",
-            notification_type=Notification.NotificationType.LEARNING_STEP_UNLOCKED
-        )
+        notify_user(
+        learning_path.student,
+        title=f"Mini Mock Unlocked: {learning_path.topic}",
+        message=f"Congratulations! You unlocked the Mini Mock step for {learning_path.topic}.",
+        notification_type=Notification.NotificationType.LEARNING_STEP_UNLOCKED,
+        target_url="/student/learning",
+    )
 
         return learning_path, True, "Quiz step completed successfully. Mini Mock unlocked!"
 
@@ -180,11 +183,12 @@ def complete_step(learning_path, step_type, score=None):
     learning_path.current_step = next_step_map.get(step_type, 'quiz')
     learning_path.save()
 
-    Notification.objects.create(
-        student=learning_path.student,
+    notify_user(
+        learning_path.student,
         title=f"Step Completed: {step_type.title()}",
         message=f"You completed the {step_type} step for {learning_path.topic}.",
-        notification_type=Notification.NotificationType.LEARNING_STEP_UNLOCKED
+        notification_type=Notification.NotificationType.LEARNING_STEP_UNLOCKED,
+        target_url="/student/learning",
     )
 
     return learning_path, True, f"{step_type.title()} step completed."
@@ -235,11 +239,12 @@ def finish_learning_path(learning_path):
             is_active=False
         )
 
-    Notification.objects.create(
-        student=learning_path.student,
+    notify_user(
+        learning_path.student,
         title=f"Learning Path Completed: {learning_path.topic}",
         message=f"Great job! You completed your learning path for {learning_path.topic}. Readiness score updated from {before_score}% to {after_score}%.",
-        notification_type=Notification.NotificationType.LEARNING_PATH_COMPLETED
+        notification_type=Notification.NotificationType.LEARNING_PATH_COMPLETED,
+        target_url="/student/learning",
     )
 
     delta = round(after_score - before_score, 2)

@@ -1,11 +1,14 @@
 from datetime import timedelta
 from django.utils import timezone
+from django.conf import settings
 
 from .models import (
     StudentTopicPerformance,
     SpacedRepetitionQueue,
-    ReadinessScore
+    ReadinessScore,
+    Notification,
 )
+from .notification_service import notify_user
 from exit_exams.models import Topic
 
 
@@ -54,6 +57,35 @@ def update_topic_performance(student, question, is_correct, response_time_second
         performance.trend = StudentTopicPerformance.Trend.STABLE
 
     performance.save()
+
+    weak_threshold = 50
+    min_attempts_for_weak_alert = 3
+    was_weak = (
+        previous_total >= min_attempts_for_weak_alert
+        and previous_accuracy < weak_threshold
+    )
+    is_weak_now = (
+        performance.total_attempts >= min_attempts_for_weak_alert
+        and performance.accuracy < weak_threshold
+    )
+    if is_weak_now and not was_weak:
+        already_alerted = Notification.objects.filter(
+            student=student,
+            notification_type=Notification.NotificationType.WEAK_TOPIC,
+            is_read=False,
+        ).exists()
+        if not already_alerted:
+            notify_user(
+                student,
+                title=f"Weak Topic Detected: {topic.name}",
+                message=(
+                    f"Your accuracy on {topic.name} has dropped to "
+                    f"{performance.accuracy}%. Start a focused learning path to improve it."
+                ),
+                notification_type=Notification.NotificationType.WEAK_TOPIC,
+                target_url="/student/learning",
+            )
+
     return performance
 
 

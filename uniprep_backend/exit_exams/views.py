@@ -14,7 +14,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, Q
-from analytics.models import ReadinessScore, StudentTopicPerformance
+from analytics.models import ReadinessScore, StudentTopicPerformance, Notification
+from analytics.notification_service import notify_user
 
 from .models import (
     Department,
@@ -1701,6 +1702,17 @@ def generate_mock_exam(request):
                 question=question,
                 order=index
             )
+
+    notify_user(
+        user,
+        title=f"Mock Exam Ready: {mock_exam.title}",
+        message=(
+            f"Your mock exam \"{mock_exam.title}\" "
+            f"({mock_exam.total_questions} questions) is ready to take."
+        ),
+        notification_type=Notification.NotificationType.MOCK_AVAILABLE,
+        target_url=f"/student/exam/{mock_exam.id}",
+    )
 
     serializer = MockExamDetailSerializer(mock_exam)
 

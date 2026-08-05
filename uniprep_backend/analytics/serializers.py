@@ -42,6 +42,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "title",
             "message",
             "notification_type",
+            "target_url",
             "is_read",
             "created_at",
         ]

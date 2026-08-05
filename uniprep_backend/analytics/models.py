@@ -75,6 +75,7 @@ class Notification(models.Model):
         max_length=30,
         choices=NotificationType.choices
     )
+    target_url = models.CharField(max_length=255, blank=True, default="")
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -171,10 +172,10 @@ class FocusSession(models.Model):
 
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
-    duration_minutes = models.PositiveIntegerField(default=0)
+    duration_minutes = models.FloatField(default=0)
 
     def __str__(self):
-        return f"{self.student.username} - {self.duration_minutes} minutes"
+        return f"{self.student.username} - {self.duration_minutes:.2f} minutes"
 
 
 class LearningPath(models.Model):

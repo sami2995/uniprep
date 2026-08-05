@@ -847,6 +847,20 @@ def mark_notification_read(request, notification_id):
     )
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_all_notifications_read(request):
+    updated = Notification.objects.filter(
+        student=request.user,
+        is_read=False
+    ).update(is_read=True)
+
+    return Response(
+        {"message": "All notifications marked as read.", "updated_count": updated},
+        status=status.HTTP_200_OK
+    )
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def unread_notification_count(request):
@@ -1000,8 +1014,8 @@ def student_dashboard(request):
             ],
 
             "focus_summary": {
-                "today_minutes": today_focus_minutes,
-                "week_minutes": week_focus_minutes,
+                "today_minutes": round(today_focus_minutes, 1),
+                "week_minutes": round(week_focus_minutes, 1),
                 "recent_sessions": [
                     {
                         "id": session.id,
@@ -1088,7 +1102,7 @@ def end_focus_session(request):
     session.ended_at = timezone.now()
 
     seconds = (session.ended_at - session.started_at).total_seconds()
-    session.duration_minutes = max(1, int(seconds // 60))
+    session.duration_minutes = round(seconds / 60, 2)
 
     session.save()
 
