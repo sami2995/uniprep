@@ -166,22 +166,22 @@ const AdminAcademic = () => {
     <div className="container py-4">
       <h2 className="fw-bold mb-2">Academic Structure</h2>
       <p className="text-muted">
-        Manage courses, domains, and topics used for Exit Exam practice.
+        Manage exit exam years, domains, and topics used for Exit Exam practice.
       </p>
 
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
       <div className="row g-4">
-        {/* Courses */}
+        {/* Exit Exams */}
         <div className="col-lg-4">
           <div className="card border-0 shadow-sm rounded-4 h-100">
             <div className="card-body p-4">
-              <h5 className="fw-bold mb-3">Courses</h5>
+              <h5 className="fw-bold mb-3">Exit Exams</h5>
 
               <form onSubmit={createCourse}>
                 <div className="mb-3">
-                  <label className="form-label">Course Name</label>
+                  <label className="form-label">Exit Exam Year</label>
                   <input
                     className="form-control"
                     value={courseForm.name}
@@ -211,7 +211,7 @@ const AdminAcademic = () => {
                 </div>
 
                 <button className="btn btn-primary w-100">
-                  Add Course
+                  Add Exit Exam
                 </button>
               </form>
 
@@ -251,7 +251,7 @@ const AdminAcademic = () => {
 
               <form onSubmit={createDomain}>
                 <div className="mb-3">
-                  <label className="form-label">Course</label>
+                  <label className="form-label">Exit Exam Year</label>
                   <select
                     className="form-select"
                     value={domainForm.course}
@@ -318,7 +318,7 @@ const AdminAcademic = () => {
                     <div>
                       <strong>{domain.name}</strong>
                       <p className="small text-muted mb-0">
-                        Course: {domain.course_name || domain.course}
+                        Exit Exam Year: {domain.course_name || domain.course}
                       </p>
                     </div>
 

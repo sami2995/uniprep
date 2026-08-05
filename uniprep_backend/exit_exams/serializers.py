@@ -3,6 +3,7 @@ from .models import (
     Department,
     Course,
     TeacherCourseAssignment,
+    TeacherTopicAssignment,
     Domain,
     Topic,
     Question,
@@ -59,6 +60,51 @@ class TeacherCourseAssignmentSerializer(serializers.ModelSerializer):
         if getattr(teacher, "role", None) != "teacher":
             raise serializers.ValidationError(
                 "Only TEACHER users can be assigned to courses."
+            )
+        return teacher
+
+
+class TeacherTopicAssignmentSerializer(serializers.ModelSerializer):
+    teacher_username = serializers.CharField(
+        source="teacher.username",
+        read_only=True
+    )
+    topic_name = serializers.CharField(
+        source="topic.name",
+        read_only=True
+    )
+    domain_name = serializers.CharField(
+        source="topic.domain.name",
+        read_only=True
+    )
+    course_id = serializers.IntegerField(
+        source="topic.domain.course.id",
+        read_only=True
+    )
+    course_name = serializers.CharField(
+        source="topic.domain.course.name",
+        read_only=True
+    )
+    department_id = serializers.IntegerField(
+        source="topic.domain.course.department.id",
+        read_only=True,
+        default=None
+    )
+    assigned_by_username = serializers.CharField(
+        source="assigned_by.username",
+        read_only=True,
+        default=""
+    )
+
+    class Meta:
+        model = TeacherTopicAssignment
+        fields = "__all__"
+        read_only_fields = ["assigned_at", "assigned_by"]
+
+    def validate_teacher(self, teacher):
+        if getattr(teacher, "role", None) != "teacher":
+            raise serializers.ValidationError(
+                "Only TEACHER users can be assigned to topics."
             )
         return teacher
 

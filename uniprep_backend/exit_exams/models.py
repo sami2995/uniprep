@@ -103,6 +103,49 @@ class Topic(models.Model):
         return f"{self.domain.name} - {self.name}"
 
 
+class TeacherTopicAssignment(models.Model):
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="topic_assignments",
+        limit_choices_to={"role": "teacher"}
+    )
+    topic = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name="teacher_assignments"
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="topic_assignments_made"
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("teacher", "topic")
+        ordering = ["topic__domain__course__name", "topic__domain__name", "topic__name", "teacher__username"]
+        indexes = [
+            models.Index(fields=["teacher"]),
+            models.Index(fields=["topic"]),
+            models.Index(fields=["active"]),
+        ]
+
+    def clean(self):
+        if self.teacher and getattr(self.teacher, "role", None) != "teacher":
+            raise ValidationError("Only TEACHER users can be assigned to topics.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.teacher.username} - {self.topic.name}"
+
+
 class Question(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"

@@ -20,6 +20,7 @@ from .models import (
     Department,
     Course,
     TeacherCourseAssignment,
+    TeacherTopicAssignment,
     Domain,
     Topic,
     Question,
@@ -40,6 +41,7 @@ from .serializers import (
     DepartmentSerializer,
     CourseSerializer,
     TeacherCourseAssignmentSerializer,
+    TeacherTopicAssignmentSerializer,
     DomainSerializer,
     TopicSerializer,
     QuestionSerializer,
@@ -63,6 +65,10 @@ from analytics.services import (
     add_wrong_question_to_spaced_repetition,
     calculate_readiness_score,
 )
+from analytics.teacher_views import (
+    clear_teacher_dashboard_cache,
+    clear_teacher_dashboard_cache_for_question,
+)
 
 from .services.pdf_importer import (
     extract_text_from_pdf,
@@ -78,6 +84,7 @@ from .services.audit_logger import (
     snapshot_question,
     snapshot_blueprint,
     snapshot_assignment,
+    snapshot_topic_assignment,
 )
 from .services.question_selector import (
     select_questions_for_domain,
@@ -136,7 +143,66 @@ def can_review_question(user, question):
     return can_review_topic(user, question.topic)
 
 
+def teacher_assigned_topic_ids(user):
+    """Return the set of Topic IDs a teacher is permitted to manage.
+
+    Topic IDs come from two sources for backward compatibility:
+      1. Explicit TeacherTopicAssignment rows (the canonical model).
+      2. Legacy TeacherCourseAssignment rows — every Topic of the assigned
+         Course is considered accessible (preserves pre-4.6 behavior).
+    """
+    if not user or not user.is_authenticated:
+        return []
+    topic_ids = set(
+        TeacherTopicAssignment.objects.filter(
+            teacher=user,
+            active=True,
+        ).values_list("topic_id", flat=True)
+    )
+    legacy_course_ids = TeacherCourseAssignment.objects.filter(
+        teacher=user
+    ).values_list("course_id", flat=True)
+    if legacy_course_ids:
+        legacy_topic_ids = Topic.objects.filter(
+            domain__course_id__in=list(legacy_course_ids)
+        ).values_list("id", flat=True)
+        topic_ids.update(legacy_topic_ids)
+    return list(topic_ids)
+
+
+def teacher_assigned_course_ids(user):
+    """Return distinct Course IDs the teacher can reach. Derives from both
+    the new topic assignments and the legacy course assignments (union) for
+    backward compatibility with course-scoped endpoints (PDF imports,
+    blueprints, mock exams, analytics)."""
+    if not user or not user.is_authenticated:
+        return []
+    course_ids = set(
+        TeacherTopicAssignment.objects.filter(
+            teacher=user,
+            active=True,
+        ).values_list("topic__domain__course_id", flat=True).distinct()
+    )
+    course_ids.update(
+        TeacherCourseAssignment.objects.filter(
+            teacher=user
+        ).values_list("course_id", flat=True)
+    )
+    return list(course_ids)
+
+
 def teacher_is_assigned_to_course(user, course_id):
+    """A teacher is considered assigned to a Course if they hold at least one
+    active Topic assignment within that Course, OR they have a legacy
+    course-level assignment to that Course."""
+    if not course_id:
+        return False
+    if TeacherTopicAssignment.objects.filter(
+        teacher=user,
+        active=True,
+        topic__domain__course_id=course_id,
+    ).exists():
+        return True
     return TeacherCourseAssignment.objects.filter(
         teacher=user,
         course_id=course_id
@@ -150,10 +216,23 @@ def topic_course_id(topic):
 
 
 def teacher_can_use_topic(user, topic):
-    return is_teacher_user(user) and teacher_is_assigned_to_course(
-        user,
-        topic_course_id(topic)
-    )
+    """Teachers can create/edit content for a Topic if EITHER:
+      - they have an active TeacherTopicAssignment for that topic (canonical),
+      - OR they have a legacy TeacherCourseAssignment to the topic's Course
+        (backward compatibility with pre-4.6 course-based ownership).
+    """
+    if not is_teacher_user(user):
+        return False
+    if TeacherTopicAssignment.objects.filter(
+        teacher=user,
+        topic=topic,
+        active=True,
+    ).exists():
+        return True
+    return TeacherCourseAssignment.objects.filter(
+        teacher=user,
+        course_id=topic.domain.course_id
+    ).exists()
 
 
 def department_head_can_manage_course(user, course):
@@ -365,9 +444,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         # Teachers see only their assigned courses
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_course_ids = teacher_assigned_course_ids(user)
             return queryset.filter(id__in=assigned_course_ids)
 
         # Students see only their department's courses
@@ -474,6 +551,7 @@ class TeacherCourseAssignmentViewSet(viewsets.ModelViewSet):
                 f"{assignment.teacher.username} to {assignment.course.name}."
             ),
         )
+        clear_teacher_dashboard_cache(assignment.teacher)
 
     def perform_update(self, serializer):
         user = self.request.user
@@ -501,6 +579,7 @@ class TeacherCourseAssignmentViewSet(viewsets.ModelViewSet):
                 f"for teacher {assignment.teacher.username} and course {assignment.course.name}."
             ),
         )
+        clear_teacher_dashboard_cache(assignment.teacher)
 
     def perform_destroy(self, instance):
         user = self.request.user
@@ -521,7 +600,9 @@ class TeacherCourseAssignmentViewSet(viewsets.ModelViewSet):
                 f"{instance.teacher.username} from {instance.course.name}."
             ),
         )
+        affected_teacher = instance.teacher
         instance.delete()
+        clear_teacher_dashboard_cache(affected_teacher)
 
 
 @api_view(["GET"])
@@ -547,6 +628,178 @@ def my_assigned_courses(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_assigned_topics(request):
+    """Return the topics the requesting teacher is actively assigned to,
+    along with their parent domain/course/department for grouping in UI."""
+    user = request.user
+
+    if not is_teacher_user(user):
+        return Response(
+            {"detail": "Only teachers can list assigned topics."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    assignments = (
+        TeacherTopicAssignment.objects
+        .filter(teacher=user, active=True)
+        .select_related(
+            "teacher",
+            "topic",
+            "topic__domain",
+            "topic__domain__course",
+            "topic__domain__course__department",
+        )
+    )
+
+    serializer = TeacherTopicAssignmentSerializer(assignments, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TeacherTopicAssignmentViewSet(viewsets.ModelViewSet):
+    """Manage teacher → topic assignments (topic-level ownership).
+
+    Replaces the coarse course-level TeacherCourseAssignment for teacher
+    ownership. The legacy ViewSet/endpoint remain available for backward
+    compatibility but the canonical source of truth is now this model.
+    """
+    serializer_class = TeacherTopicAssignmentSerializer
+    permission_classes = [IsDepartmentHeadOrSystemAdmin]
+
+    def get_queryset(self):
+        queryset = TeacherTopicAssignment.objects.select_related(
+            "teacher",
+            "topic",
+            "topic__domain",
+            "topic__domain__course",
+            "topic__domain__course__department",
+            "assigned_by",
+        )
+
+        teacher_id = self.request.query_params.get("teacher_id")
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+
+        topic_id = self.request.query_params.get("topic_id")
+        if topic_id:
+            queryset = queryset.filter(topic_id=topic_id)
+
+        active = self.request.query_params.get("active")
+        if active is not None:
+            queryset = queryset.filter(active=active.lower() in ("true", "1", "yes"))
+
+        user = self.request.user
+        if is_system_admin_user(user):
+            return queryset
+
+        if is_department_head_user(user):
+            department = get_user_department(user)
+            return (
+                queryset.filter(topic__domain__course__department=department)
+                if department
+                else queryset.none()
+            )
+
+        if user.is_staff:
+            return queryset
+
+        return queryset.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        topic = serializer.validated_data["topic"]
+        teacher = serializer.validated_data["teacher"]
+
+        if is_department_head_user(user) and not is_system_admin_user(user):
+            department = get_user_department(user)
+            if not department:
+                raise PermissionDenied("Department head has no department assigned.")
+            if topic.domain.course.department_id != department.id:
+                raise PermissionDenied(
+                    "Department heads can assign teachers only to topics within their department."
+                )
+            if teacher.department_id and teacher.department_id != department.id:
+                raise PermissionDenied(
+                    "Department heads can assign only teachers in their department."
+                )
+
+        assignment = serializer.save(assigned_by=user)
+        log_action(
+            user=user,
+            action=AuditLog.Action.ASSIGNMENT_CHANGED,
+            entity_type="topic_assignment",
+            entity_id=assignment.id,
+            new_value=snapshot_topic_assignment(assignment),
+            description=(
+                f"{user.username} assigned teacher "
+                f"{assignment.teacher.username} to topic "
+                f"{assignment.topic.name}."
+            ),
+        )
+        clear_teacher_dashboard_cache(assignment.teacher)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        instance = self.get_object()
+        topic = serializer.validated_data.get("topic", instance.topic)
+        teacher = serializer.validated_data.get("teacher", instance.teacher)
+
+        if is_department_head_user(user) and not is_system_admin_user(user):
+            department = get_user_department(user)
+            if not department:
+                raise PermissionDenied("Department head has no department assigned.")
+            if instance.topic.domain.course.department_id != department.id or topic.domain.course.department_id != department.id:
+                raise PermissionDenied(
+                    "Department heads can update only assignments within their department."
+                )
+            if teacher.department_id and teacher.department_id != department.id:
+                raise PermissionDenied(
+                    "Department heads can assign only teachers in their department."
+                )
+
+        prev = snapshot_topic_assignment(instance)
+        assignment = serializer.save(assigned_by=user)
+        log_action(
+            user=user,
+            action=AuditLog.Action.ASSIGNMENT_CHANGED,
+            entity_type="topic_assignment",
+            entity_id=assignment.id,
+            previous_value=prev,
+            new_value=snapshot_topic_assignment(assignment),
+            description=(
+                f"{user.username} updated topic assignment "
+                f"for teacher {assignment.teacher.username}."
+            ),
+        )
+        clear_teacher_dashboard_cache(assignment.teacher)
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if is_department_head_user(user) and not is_system_admin_user(user):
+            department = get_user_department(user)
+            if not department or instance.topic.domain.course.department_id != department.id:
+                raise PermissionDenied(
+                    "Department heads can remove only assignments within their department."
+                )
+
+        prev = snapshot_topic_assignment(instance)
+        log_action(
+            user=user,
+            action=AuditLog.Action.ASSIGNMENT_CHANGED,
+            entity_type="topic_assignment",
+            entity_id=instance.id,
+            previous_value=prev,
+            description=(
+                f"{user.username} removed teacher "
+                f"{instance.teacher.username} from topic {instance.topic.name}."
+            ),
+        )
+        affected_teacher = instance.teacher
+        instance.delete()
+        clear_teacher_dashboard_cache(affected_teacher)
+
+
 class DomainViewSet(viewsets.ModelViewSet):
     queryset = Domain.objects.all()
     serializer_class = DomainSerializer
@@ -568,9 +821,7 @@ class DomainViewSet(viewsets.ModelViewSet):
 
         # Teachers see only domains from their assigned courses
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_course_ids = teacher_assigned_course_ids(user)
             return queryset.filter(course_id__in=assigned_course_ids)
 
         # Students see only domains from their department's courses
@@ -633,12 +884,10 @@ class TopicViewSet(viewsets.ModelViewSet):
                 return queryset.filter(domain__course__department=department)
             return queryset.none()
 
-        # Teachers see only topics from their assigned courses
+        # Teachers see only topics they are explicitly assigned to
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
-            return queryset.filter(domain__course_id__in=assigned_course_ids)
+            assigned_topic_ids = teacher_assigned_topic_ids(user)
+            return queryset.filter(id__in=assigned_topic_ids)
 
         # Students see only topics from their department's courses
         if is_student_user(user):
@@ -704,12 +953,10 @@ class QuestionViewSet(viewsets.ModelViewSet):
             )
 
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_topic_ids = teacher_assigned_topic_ids(user)
             return queryset.filter(
                 created_by=user,
-                topic__domain__course_id__in=assigned_course_ids,
+                topic_id__in=assigned_topic_ids,
             )
 
         if is_department_head_user(user):
@@ -734,7 +981,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
         topic = serializer.validated_data["topic"]
         if not teacher_can_use_topic(user, topic):
-            raise PermissionDenied("Teachers can create questions only for assigned courses.")
+            raise PermissionDenied("Teachers can create questions only for assigned topics.")
 
         choices = (
             serializer.validated_data.pop("_validated_choices", None)
@@ -763,6 +1010,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
             new_value=snapshot_question(question),
             description=f"Teacher {user.username} created draft question.",
         )
+        clear_teacher_dashboard_cache(user)
 
     def perform_update(self, serializer):
         question = self.get_object()
@@ -785,7 +1033,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         prev = snapshot_question(question)
         topic = serializer.validated_data.get("topic", question.topic)
         if not teacher_can_use_topic(user, topic):
-            raise PermissionDenied("Teachers can edit questions only for assigned courses.")
+            raise PermissionDenied("Teachers can edit questions only for assigned topics.")
 
         choices = (
             serializer.validated_data.pop("_validated_choices", None)
@@ -812,6 +1060,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
             new_value=snapshot_question(updated),
             description=f"Teacher {user.username} edited question (was {prev['status']}).",
         )
+        clear_teacher_dashboard_cache(user)
 
     def perform_destroy(self, instance):
         user = self.request.user
@@ -831,6 +1080,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
             previous_value=snapshot_question(instance),
             description=f"Teacher {user.username} deleted draft question.",
         )
+        clear_teacher_dashboard_cache(user)
         instance.delete()
 
 
@@ -898,6 +1148,7 @@ def submit_question_for_approval(request, question_id):
         new_value=snapshot_question(question),
         description=f"Teacher {user.username} submitted question for approval.",
     )
+    clear_teacher_dashboard_cache(user)
 
     serializer = QuestionSerializer(question)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -997,6 +1248,7 @@ def approve_question(request, question_id):
         new_value=snapshot_question(question),
         description=f"Dept Head {user.username} approved question.",
     )
+    clear_teacher_dashboard_cache_for_question(question)
 
     serializer = QuestionSerializer(question)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1075,6 +1327,7 @@ def reject_question(request, question_id):
         },
         description=f"Dept Head {user.username} rejected question: {question.rejection_reason[:100]}",
     )
+    clear_teacher_dashboard_cache_for_question(question)
 
     response_serializer = QuestionSerializer(question)
     return Response(response_serializer.data, status=status.HTTP_200_OK)
@@ -1093,16 +1346,14 @@ class ChoiceViewSet(viewsets.ModelViewSet):
         )
 
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_topic_ids = teacher_assigned_topic_ids(user)
             return queryset.filter(
                 question__created_by=user,
                 question__status__in=[
                     Question.Status.DRAFT,
                     Question.Status.REJECTED,
                 ],
-                question__topic__domain__course_id__in=assigned_course_ids,
+                question__topic_id__in=assigned_topic_ids,
             )
 
         if is_department_head_user(user):
@@ -1130,7 +1381,7 @@ class ChoiceViewSet(viewsets.ModelViewSet):
             and question.status in {Question.Status.DRAFT, Question.Status.REJECTED}
             and teacher_can_use_topic(user, question.topic)
         ):
-            raise PermissionDenied("Teachers can manage choices only for their own draft or rejected assigned-course questions.")
+            raise PermissionDenied("Teachers can manage choices only for their own draft or rejected assigned-topic questions.")
         serializer.save()
 
     def perform_update(self, serializer):
@@ -1145,7 +1396,7 @@ class ChoiceViewSet(viewsets.ModelViewSet):
             and question.status in {Question.Status.DRAFT, Question.Status.REJECTED}
             and teacher_can_use_topic(user, question.topic)
         ):
-            raise PermissionDenied("Teachers can manage choices only for their own draft or rejected assigned-course questions.")
+            raise PermissionDenied("Teachers can manage choices only for their own draft or rejected assigned-topic questions.")
         serializer.save()
 
     def perform_destroy(self, instance):
@@ -1159,7 +1410,7 @@ class ChoiceViewSet(viewsets.ModelViewSet):
             and question.status in {Question.Status.DRAFT, Question.Status.REJECTED}
             and teacher_can_use_topic(user, question.topic)
         ):
-            raise PermissionDenied("Teachers can delete choices only for their own draft or rejected assigned-course questions.")
+            raise PermissionDenied("Teachers can delete choices only for their own draft or rejected assigned-topic questions.")
         instance.delete()
 
 
@@ -1752,9 +2003,7 @@ class ExamPdfImportViewSet(viewsets.ModelViewSet):
         )
 
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_course_ids = teacher_assigned_course_ids(user)
             return queryset.filter(
                 uploaded_by=user,
                 course_id__in=assigned_course_ids
@@ -1779,7 +2028,7 @@ class ExamPdfImportViewSet(viewsets.ModelViewSet):
         if is_teacher_user(user):
             if not teacher_is_assigned_to_course(user, course.id):
                 raise PermissionDenied(
-                    "Teachers can upload exam PDFs only for assigned courses."
+                    "Teachers can upload exam PDFs only for assigned topics."
                 )
         elif is_department_head_user(user):
             department = get_user_department(user)
@@ -1810,9 +2059,7 @@ class ExtractedQuestionViewSet(viewsets.ModelViewSet):
         )
 
         if is_teacher_user(user):
-            assigned_course_ids = TeacherCourseAssignment.objects.filter(
-                teacher=user
-            ).values_list("course_id", flat=True)
+            assigned_course_ids = teacher_assigned_course_ids(user)
             return queryset.filter(
                 exam_import__uploaded_by=user,
                 exam_import__course_id__in=assigned_course_ids
@@ -2261,9 +2508,7 @@ def submit_extracted_questions_for_approval(request):
         "exam_import__course__department",
     )
 
-    assigned_course_ids = TeacherCourseAssignment.objects.filter(
-        teacher=user
-    ).values_list("course_id", flat=True)
+    assigned_course_ids = teacher_assigned_course_ids(user)
     queryset = queryset.filter(exam_import__course_id__in=assigned_course_ids)
 
     if import_id:
@@ -2434,7 +2679,11 @@ def admin_dashboard_stats(request):
             mock_exam__course=scoped_course
         ).values_list("student_id", flat=True).distinct()
         total_students = User.objects.filter(id__in=student_ids, role="student").count()
-        total_teachers = TeacherCourseAssignment.objects.filter(course=scoped_course).count()
+        total_teachers = (
+            TeacherTopicAssignment.objects
+            .filter(topic__domain__course=scoped_course, active=True)
+            .values("teacher_id").distinct().count()
+        )
         total_department_heads = 0
         total_system_admins = 0
         total_courses = 1
@@ -2799,9 +3048,7 @@ def auto_classify_extracted_questions(request):
     )
 
     if is_teacher_user(user):
-        assigned_course_ids = TeacherCourseAssignment.objects.filter(
-            teacher=user
-        ).values_list("course_id", flat=True)
+        assigned_course_ids = teacher_assigned_course_ids(user)
         queryset = queryset.filter(
             exam_import__uploaded_by=user,
             exam_import__course_id__in=assigned_course_ids,

@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 
 from .models import CustomUser, StudentProfile
 from .serializers import RegisterSerializer, UserSerializer
-from exit_exams.models import Course, TeacherCourseAssignment, Department, AuditLog
+from exit_exams.models import Course, TeacherCourseAssignment, TeacherTopicAssignment, Department, AuditLog
 from exit_exams.permissions import IsSystemAdminOnly
 
 
@@ -36,6 +36,11 @@ def current_user(request):
             TeacherCourseAssignment.objects.filter(
                 teacher=request.user
             ).values_list("course__name", flat=True)
+        )
+        user_data["assigned_topics"] = list(
+            TeacherTopicAssignment.objects.filter(
+                teacher=request.user, active=True
+            ).values_list("topic__name", flat=True)
         )
         user_data["questions_authored"] = request.user.created_questions.count()
     elif request.user.role == CustomUser.Role.DEPARTMENT_HEAD:

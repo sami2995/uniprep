@@ -33,10 +33,9 @@ export const SIDEBAR_LINKS = {
   ],
   [ROLES.TEACHER]: [
     { label: "Dashboard", path: "/teacher/dashboard", icon: "Home" },
-    { label: "My Courses", path: "/teacher/courses", icon: "GraduationCap" },
-    { label: "My Questions", path: "/teacher/questions", icon: "CircleHelp" },
+    { label: "My Teaching Topics", path: "/teacher/courses", icon: "GraduationCap" },
+    { label: "Create My Questions", path: "/teacher/questions", icon: "CircleHelp" },
     { label: "Import Previous Exit Exam", path: "/teacher/pdf-imports", icon: "FileText" },
-    { label: "Create Question", path: "/teacher/questions", icon: "CircleHelp" },
     { label: "My Drafts", path: "/teacher/questions?filter=draft", icon: "FileText" },
     { label: "Pending Approval", path: "/teacher/questions?filter=submitted", icon: "CheckSquare" },
     { label: "Import History", path: "/teacher/pdf-imports?filter=all", icon: "ScrollText" },

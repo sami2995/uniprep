@@ -14,7 +14,7 @@ const PROCESS_STEPS = [
   "Uploading...",
   "Processing PDF...",
   "Extracting Questions...",
-  "Assigning Course...",
+  "Assigning Exit Exam Year...",
   "Assigning Domain...",
   "Assigning Topic...",
   "Checking Duplicates...",
@@ -601,7 +601,7 @@ const AdminPdfImports = () => {
       </h2>
       <p className="text-muted">
         {isTeacher
-          ? "Upload previous exit exam PDFs for assigned courses, review extracted questions, and submit them for department head approval."
+          ? "Upload previous exit exam PDFs for assigned exit exam years, review extracted questions, and submit them for department head approval."
           : "Upload mock/Exit Exam PDFs, extract MCQs, review them, and approve valid questions into the official question bank."}
       </p>
 
@@ -674,7 +674,7 @@ const AdminPdfImports = () => {
 
               <form onSubmit={uploadPdf}>
                 <div className="mb-3">
-                  <label className="form-label">Course</label>
+                  <label className="form-label">Exit Exam Year</label>
                   <select
                     name="course"
                     className="form-select"

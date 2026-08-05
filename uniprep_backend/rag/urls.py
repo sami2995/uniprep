@@ -16,7 +16,9 @@ from .views import (
     generate_material_flashcards,
     generate_material_quiz,
     get_material_quiz,
-    get_material_chat
+    get_material_chat,
+    submit_material_quiz,
+    get_material_quiz_attempt,
 )
 
 
@@ -65,6 +67,16 @@ urlpatterns = [
         "materials/<int:material_id>/quiz/",
         get_material_quiz,
         name="get-material-quiz"
+    ),
+    path(
+        "materials/<int:material_id>/quiz/submit/",
+        submit_material_quiz,
+        name="submit-material-quiz"
+    ),
+    path(
+        "materials/<int:material_id>/quiz/attempts/<int:attempt_id>/",
+        get_material_quiz_attempt,
+        name="get-material-quiz-attempt"
     ),
     path(
         "materials/<int:material_id>/chat/",

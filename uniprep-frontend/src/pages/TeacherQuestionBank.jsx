@@ -30,7 +30,7 @@ const TeacherQuestionBank = () => {
   const [searchParams] = useSearchParams();
   const [questions, setQuestions] = useState([]);
   const [topics, setTopics] = useState([]);
-  const [courses, setCourses] = useState([]);
+  const [teachingTopics, setTeachingTopics] = useState([]);
   const [domains, setDomains] = useState([]);
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -69,17 +69,24 @@ const TeacherQuestionBank = () => {
 
   const loadMetadata = async () => {
     try {
-      const [topicsRes, coursesRes, domainsRes] = await Promise.all([
+      const [topicsRes, assignedRes, domainsRes] = await Promise.all([
         api.get("/exit-exams/topics/"),
-        api.get("/exit-exams/my-assigned-courses/"),
+        api.get("/exit-exams/my-assigned-topics/"),
         api.get("/exit-exams/domains/"),
       ]);
-      setTopics(topicsRes.data);
-      setCourses(coursesRes.data);
+      // Topics the teacher may create questions for come from the canonical
+      // TeacherTopicAssignment endpoint. The autocomplete listing ("topics")
+      // is filtered server-side to the same set, so intersect to be safe.
+      const assignedTopicIds = new Set(assignedRes.data.map((a) => a.topic));
+      const allowedTopics = topicsRes.data.filter((t) =>
+        assignedTopicIds.has(t.id)
+      );
+      setTopics(allowedTopics);
+      setTeachingTopics(assignedRes.data);
       setDomains(domainsRes.data);
 
-      if (topicsRes.data.length > 0) {
-        setForm((f) => ({ ...f, topic: topicsRes.data[0].id }));
+      if (allowedTopics.length > 0) {
+        setForm((f) => ({ ...f, topic: allowedTopics[0].id }));
       }
     } catch {
       setError("Failed to load form data.");

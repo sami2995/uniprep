@@ -7,7 +7,9 @@ from .models import (
     MaterialSummary,
     GeneratedFlashcard,
     GeneratedQuiz,
-    GeneratedQuizQuestion
+    GeneratedQuizQuestion,
+    MaterialQuizAttempt,
+    MaterialQuizAnswer,
 )
 
 
@@ -19,3 +21,5 @@ admin.site.register(MaterialSummary)
 admin.site.register(GeneratedFlashcard)
 admin.site.register(GeneratedQuiz)
 admin.site.register(GeneratedQuizQuestion)
+admin.site.register(MaterialQuizAttempt)
+admin.site.register(MaterialQuizAnswer)

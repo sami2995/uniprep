@@ -16,6 +16,7 @@ from .views import (
     end_focus_session,
     focus_summary
 )
+from .teacher_views import teacher_dashboard
 
 
 router = DefaultRouter()
@@ -26,6 +27,7 @@ router.register("readiness-scores", ReadinessScoreViewSet, basename="readiness-s
 
 urlpatterns = [
     path("dashboard/", student_dashboard, name="student-dashboard"),
+    path("teacher-dashboard/", teacher_dashboard, name="teacher-dashboard"),
     path("student/weakness/", student_weakness, name="student-weakness"),
     path("student/trend/", student_trend, name="student-trend"),
     path("student/recommendations/", student_recommendations, name="student-recommendations"),

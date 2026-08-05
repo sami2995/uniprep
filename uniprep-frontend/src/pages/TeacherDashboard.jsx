@@ -12,7 +12,7 @@ const STATUS_COLORS = {
 const TeacherDashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentQuestions, setRecentQuestions] = useState([]);
-  const [courses, setCourses] = useState([]);
+  const [teachingTopics, setTeachingTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -22,9 +22,9 @@ const TeacherDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [questionsRes, coursesRes] = await Promise.all([
+      const [questionsRes, assignedRes] = await Promise.all([
         api.get("/exit-exams/questions/search/?page_size=5"),
-        api.get("/exit-exams/my-assigned-courses/"),
+        api.get("/exit-exams/my-assigned-topics/"),
       ]);
 
       const questions = questionsRes.data.results || [];
@@ -44,11 +44,11 @@ const TeacherDashboard = () => {
         pending: pendingRes.data.count || 0,
         approved: approvedRes.data.count || 0,
         rejected: rejectedRes.data.count || 0,
-        courses: coursesRes.data.length,
+        topics: assignedRes.data.length,
       });
 
       setRecentQuestions(questions);
-      setCourses(coursesRes.data);
+      setTeachingTopics(assignedRes.data);
     } catch {
       setError("Failed to load dashboard data.");
     } finally {
@@ -73,7 +73,8 @@ const TeacherDashboard = () => {
           <span className="dashboard-badge">Teacher Portal</span>
           <h2 className="fw-bold mt-2 mb-1">Teacher Dashboard</h2>
           <p className="text-muted mb-0">
-            Manage your questions, track approvals, and monitor your courses.
+            Manage your questions, track approvals, and monitor your teaching
+            topics.
           </p>
         </div>
         <div className="d-flex gap-2 flex-wrap">
@@ -81,7 +82,7 @@ const TeacherDashboard = () => {
             + New Question
           </Link>
           <Link className="btn btn-outline-primary" to="/teacher/courses">
-            My Courses
+            My Teaching Topics
           </Link>
         </div>
       </div>
@@ -193,7 +194,7 @@ const TeacherDashboard = () => {
                   Fix Rejected ({stats?.rejected || 0})
                 </Link>
                 <Link className="btn btn-outline-secondary" to="/teacher/courses">
-                  View My Courses
+                  View My Teaching Topics
                 </Link>
                 <Link className="btn btn-outline-primary" to="/teacher/analytics">
                   View Analytics
@@ -202,20 +203,39 @@ const TeacherDashboard = () => {
             </div>
           </div>
 
-          {/* Assigned Courses */}
+          {/* Assigned Teaching Topics */}
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-4">
-              <h5 className="fw-bold mb-3">Assigned Courses</h5>
-              {courses.length === 0 ? (
-                <p className="text-muted small">No courses assigned yet.</p>
+              <h5 className="fw-bold mb-3">Assigned Teaching Topics</h5>
+              {teachingTopics.length === 0 ? (
+                <p className="text-muted small">
+                  No topics assigned yet. Topics will appear here after a
+                  department head assigns you to one.
+                </p>
               ) : (
                 <div className="d-grid gap-2">
-                  {courses.map((a) => (
-                    <div key={a.id} className="d-flex align-items-center gap-2">
-                      <span className="badge bg-primary rounded-pill">📘</span>
-                      <span className="fw-semibold small">{a.course_name}</span>
+                  {teachingTopics.slice(0, 8).map((a) => (
+                    <div
+                      key={a.id}
+                      className="d-flex align-items-center gap-2"
+                    >
+                      <span className="badge bg-primary rounded-pill">🔖</span>
+                      <span className="fw-semibold small">
+                        {a.topic_name}
+                      </span>
+                      <span className="text-muted small ms-auto">
+                        {a.domain_name}
+                      </span>
                     </div>
                   ))}
+                  {teachingTopics.length > 8 && (
+                    <Link
+                      className="btn btn-sm btn-outline-primary mt-1"
+                      to="/teacher/courses"
+                    >
+                      View all {teachingTopics.length}
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

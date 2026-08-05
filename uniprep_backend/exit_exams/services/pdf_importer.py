@@ -104,9 +104,13 @@ def parse_mcq_questions(text):
 
     text = normalize_text(text)
 
-    pattern = re.compile(
+    # Format A (Moodle export): doubled option letters ("A. a.\n<text>"),
+    # "Ans." answer token. Kept exactly as before; only the question-number
+    # and final lookahead got the optional-dot / explicit \xa0 tweak (both
+    # are supersets, so bare-digit Moodle files still match identically).
+    moodle_pattern = re.compile(
         r"""
-        (?m)^\s*(?P<number>\d{1,3})\s+
+        (?m)^\s*(?P<number>\d{1,3})\.?[\s\xa0]+
         (?P<question>.*?)
         \s+A\.\s*a\.\s*(?P<a>.*?)
         \s+B\.\s*b\.\s*(?P<b>.*?)
@@ -115,41 +119,81 @@ def parse_mcq_questions(text):
         \s+(?:Ans\s*\.|ans\s*\.)\s*
         (?:(?P<answer>[a-dA-D])\.?\s*)?
         (?P<answer_text>.*?)
-        (?=^\s*\d{1,3}\s+|\bQuestion number\s+100\b|\Z)
+        (?=^\s*\d{1,3}\.?[\s\xa0]+|\bQuestion number\s+100\b|\Z)
         """,
         re.DOTALL | re.VERBOSE,
     )
 
+# Format B (Ministry-style real exam): inline single-letter options
+    # ("A. <text>"), "The correct answer is X." answer token. Mirrors the
+    # Moodle pattern but with the doubled-letter step dropped and an extra
+    # answer-token alternative added. Answer letter is inferred via the
+    # existing infer_answer_letter() when only answer text is captured.
+    # The question-text token is *tempered* so it cannot cross a following
+    # question-number line. This prevents numbered sub-lists inside an
+    # explanation (e.g. "1. Set of states ... 2. ... 5. ...") from being
+    # mistaken for a new question starter, which would otherwise create a
+    # phantom match that swallows a later real question's option block.
+    ministry_boundary = r"(?!^\s*\d{1,3}\.?[\s\xa0]+)"
+    ministry_pattern = re.compile(
+        r"""
+        (?m)^\s*(?P<number>\d{1,3})\.?[\s\xa0]+
+        (?P<question>(?:""" + ministry_boundary + r""".)*?)
+        [\s\xa0]+A\.\s+(?P<a>.*?)
+        [\s\xa0]+B\.\s+(?P<b>.*?)
+        [\s\xa0]+C\.\s+(?P<c>.*?)
+        [\s\xa0]+D\.\s+(?P<d>.*?)
+        [\s\xa0]+(?i:Ans\s*\.|The\s+correct\s+answer\s+is|Correct\s+answer\s*:?)\s*
+        (?:(?P<answer>[a-dA-D])\.?\s*)?
+        (?P<answer_text>.*?)
+        (?=^\s*\d{1,3}\.?[\s\xa0]+|\bQuestion number\s+100\b|\Z)
+        """,
+        re.DOTALL | re.VERBOSE,
+    )
+
+    def _collect(pattern, found, questions):
+        for match in pattern.finditer(text):
+            number = int(match.group("number"))
+
+            if number in found:
+                continue
+
+            options = {
+                "A": clean_text(match.group("a")),
+                "B": clean_text(match.group("b")),
+                "C": clean_text(match.group("c")),
+                "D": clean_text(match.group("d")),
+            }
+
+            answer = match.group("answer")
+            answer_text = clean_text(match.group("answer_text"))
+
+            if answer:
+                correct_answer = answer.upper()
+            else:
+                correct_answer = infer_answer_letter(answer_text, options)
+
+            questions.append({
+                "question_number": number,
+                "question_text": clean_text(match.group("question")),
+                "option_a": options["A"],
+                "option_b": options["B"],
+                "option_c": options["C"],
+                "option_d": options["D"],
+                "correct_answer": correct_answer,
+                "explanation": answer_text,
+            })
+            found.add(number)
+
     questions = []
+    found = set()
 
-    for match in pattern.finditer(text):
-        number = int(match.group("number"))
+    # Moodle format tried first and takes precedence; Ministry format fills
+    # in any question numbers Moodle missed (tried in order, as required).
+    _collect(moodle_pattern, found, questions)
+    _collect(ministry_pattern, found, questions)
 
-        options = {
-            "A": clean_text(match.group("a")),
-            "B": clean_text(match.group("b")),
-            "C": clean_text(match.group("c")),
-            "D": clean_text(match.group("d")),
-        }
-
-        answer = match.group("answer")
-        answer_text = clean_text(match.group("answer_text"))
-
-        if answer:
-            correct_answer = answer.upper()
-        else:
-            correct_answer = infer_answer_letter(answer_text, options)
-
-        questions.append({
-            "question_number": number,
-            "question_text": clean_text(match.group("question")),
-            "option_a": options["A"],
-            "option_b": options["B"],
-            "option_c": options["C"],
-            "option_d": options["D"],
-            "correct_answer": correct_answer,
-            "explanation": answer_text,
-        })
+    questions.sort(key=lambda q: q["question_number"])
 
     return questions
 
@@ -165,9 +209,15 @@ def extract_answer_key(text):
     answer_key = {}
 
     matches = re.findall(
-        r"^\s*(\d{1,3}).*?(?:Ans\s*\.|ans\s*\.)\s*([A-Da-d])",
+        r"""
+        ^\s*(\d{1,3})
+        .*?
+        (?i:Ans\s*\.|\bThe\s+correct\s+answer\s+is\b|\bCorrect\s+answer\s*:?)
+        \s*
+        ([A-Da-d])
+        """,
         text,
-        flags=re.DOTALL | re.MULTILINE
+        flags=re.DOTALL | re.MULTILINE | re.VERBOSE,
     )
 
     for number, answer in matches:

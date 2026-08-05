@@ -1,30 +1,32 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import api from "../api/api";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { useAuth } from "../auth/AuthContext";
 
 const TeacherAssignments = () => {
-  const [assignments, setAssignments] = useState([]);
+  const { user } = useAuth();
   const [teachers, setTeachers] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [form, setForm] = useState({ teacher: "", course: "" });
+  const [topics, setTopics] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [filterTeacher, setFilterTeacher] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [pendingState, setPendingState] = useState({});
 
-  const loadData = useCallback(async () => {
+  const loadMetaData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [assignRes, courseRes, teacherRes] = await Promise.all([
-        api.get("/exit-exams/teacher-course-assignments/"),
-        api.get("/exit-exams/courses/"),
+      const [teacherRes, topicRes] = await Promise.all([
         api.get("/admin/teachers/"),
+        api.get("/exit-exams/topics/"),
       ]);
 
-      setAssignments(assignRes.data);
-      setCourses(courseRes.data);
       setTeachers(teacherRes.data);
+      setTopics(topicRes.data);
     } catch {
       setError("Failed to load assignment data.");
     } finally {
@@ -33,66 +35,157 @@ const TeacherAssignments = () => {
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadMetaData();
+  }, [loadMetaData]);
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+  const fetchAssignments = useCallback(async (teacherId) => {
+    if (!teacherId) {
+      setAssignments([]);
+      setPendingState({});
+      setDirty(false);
+      return;
+    }
+    setError("");
+    try {
+      const res = await api.get(
+        `/exit-exams/teacher-topic-assignments/?teacher_id=${teacherId}`
+      );
+      setAssignments(res.data);
+      const stateMap = {};
+      res.data.forEach((a) => {
+        if (a.active) stateMap[a.topic] = a.id;
+      });
+      setPendingState(stateMap);
+      setDirty(false);
+    } catch {
+      setError("Failed to load this teacher's current topic assignments.");
+    }
+  }, []);
+
+  const handleTeacherChange = (e) => {
+    const value = e.target.value;
+    setSelectedTeacherId(value);
+    setSuccess("");
+    fetchAssignments(value);
   };
 
-  const createAssignment = async (e) => {
+  const toggleTopic = (topicId) => {
+    setPendingState((prev) => {
+      const next = { ...prev };
+      if (next[topicId]) {
+        delete next[topicId];
+      } else {
+        next[topicId] = "new";
+      }
+      return next;
+    });
+    setDirty(true);
+  };
+
+  // Group topics under their domain.
+  const topicsByDomain = useMemo(() => {
+    const groups = {};
+    topics.forEach((t) => {
+      const domainName = t.domain_name || "(Uncategorised)";
+      if (!groups[domainName]) {
+        groups[domainName] = { domainName, topics: [] };
+      }
+      groups[domainName].topics.push(t);
+    });
+    return Object.values(groups).sort((a, b) =>
+      a.domainName.localeCompare(b.domainName)
+    );
+  }, [topics]);
+
+  const selectedTeacher = useMemo(
+    () => teachers.find((t) => String(t.id) === String(selectedTeacherId)),
+    [teachers, selectedTeacherId]
+  );
+
+  const currentAssignedCount = useMemo(
+    () => assignments.filter((a) => a.active).length,
+    [assignments]
+  );
+
+  const pendingAssignedCount = useMemo(
+    () => Object.keys(pendingState).length,
+    [pendingState]
+  );
+
+  const lastUpdated = useMemo(() => {
+    if (!assignments.length) return "—";
+    const ts = assignments
+      .map((a) => new Date(a.assigned_at).getTime())
+      .filter(Boolean)
+      .sort();
+    if (!ts.length) return "—";
+    return new Date(ts[ts.length - 1]).toLocaleString();
+  }, [assignments]);
+
+  const saveAssignment = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!form.teacher || !form.course) {
-      setError("Please select both a teacher and a course.");
+    if (!selectedTeacherId) {
+      setError("Please select a teacher first.");
       return;
     }
 
-    try {
-      await api.post("/exit-exams/teacher-course-assignments/", {
-        teacher: Number(form.teacher),
-        course: Number(form.course),
-      });
-      setSuccess("Teacher assigned to course successfully.");
-      setForm({ teacher: "", course: "" });
-      await loadData();
-    } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          err.response?.data?.non_field_errors?.[0] ||
-          "Failed to create assignment."
-      );
+    setSaving(true);
+    const teacherId = Number(selectedTeacherId);
+    const errors = [];
+
+    // 1) Remove unchecked topics that previously had an active assignment.
+    for (const a of assignments) {
+      if (a.active && !pendingState[a.topic]) {
+        try {
+          await api.delete(`/exit-exams/teacher-topic-assignments/${a.id}/`);
+        } catch (err) {
+          errors.push(
+            err.response?.data?.detail ||
+              `Failed to remove assignment for topic #${a.topic}.`
+          );
+        }
+      }
+    }
+
+    // 2) Create assignments for newly-checked topics.
+    for (const topicIdStr of Object.keys(pendingState)) {
+      const topicId = Number(topicIdStr);
+      if (pendingState[topicIdStr] === "new") {
+        try {
+          await api.post("/exit-exams/teacher-topic-assignments/", {
+            teacher: teacherId,
+            topic: topicId,
+            active: true,
+          });
+        } catch (err) {
+          errors.push(
+            err.response?.data?.detail ||
+              err.response?.data?.non_field_errors?.[0] ||
+              `Failed to assign topic #${topicId}.`
+          );
+        }
+      }
+    }
+
+    setSaving(false);
+    setDirty(false);
+
+    if (errors.length) {
+      setError(errors.join(" "));
+    } else {
+      setSuccess("Topic assignments saved successfully.");
+      await fetchAssignments(selectedTeacherId);
     }
   };
-
-  const deleteAssignment = async (id) => {
-    if (!window.confirm("Remove this teacher assignment?")) return;
-    setError("");
-    setSuccess("");
-    try {
-      await api.delete(`/exit-exams/teacher-course-assignments/${id}/`);
-      setSuccess("Assignment removed.");
-      await loadData();
-    } catch {
-      setError("Failed to remove assignment.");
-    }
-  };
-
-  const byTeacher = {};
-  assignments.forEach((a) => {
-    const tName = a.teacher_username || `Teacher #${a.teacher}`;
-    if (!byTeacher[tName]) byTeacher[tName] = [];
-    byTeacher[tName].push(a);
-  });
 
   const filteredTeachers = filterTeacher
-    ? Object.entries(byTeacher).filter(([name]) =>
-        name.toLowerCase().includes(filterTeacher.toLowerCase())
+    ? teachers.filter((t) =>
+        t.username.toLowerCase().includes(filterTeacher.toLowerCase())
       )
-    : Object.entries(byTeacher);
+    : teachers;
 
   if (loading) {
     return (
@@ -109,7 +202,8 @@ const TeacherAssignments = () => {
           <span className="dashboard-badge">Department Head</span>
           <h2 className="fw-bold mt-2 mb-1">Teacher Assignments</h2>
           <p className="text-muted mb-0">
-            Assign teachers to courses they can create questions for.
+            Assign teachers to the specific topics they are responsible for,
+            grouped by domain.
           </p>
         </div>
       </div>
@@ -133,23 +227,22 @@ const TeacherAssignments = () => {
           <div className="card border-0 shadow-sm rounded-4 mb-4">
             <div className="card-body p-4">
               <h5 className="fw-bold mb-3">New Assignment</h5>
-              <form onSubmit={createAssignment}>
+              <form onSubmit={saveAssignment}>
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Teacher</label>
                   <select
-                    name="teacher"
                     className="form-select"
-                    value={form.teacher}
-                    onChange={handleFormChange}
+                    value={selectedTeacherId}
+                    onChange={handleTeacherChange}
                     required
                   >
                     <option value="">Select a teacher...</option>
-                    {teachers
+                    {filteredTeachers
                       .filter((t) => t.is_active)
                       .map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.username}{" "}
-                          {t.email ? `(${t.email})` : ""}
+                          {t.username}
+                          {t.email ? ` (${t.email})` : ""}
                         </option>
                       ))}
                   </select>
@@ -160,32 +253,33 @@ const TeacherAssignments = () => {
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Course</label>
-                  <select
-                    name="course"
-                    className="form-select"
-                    value={form.course}
-                    onChange={handleFormChange}
-                    required
-                  >
-                    <option value="">Select a course...</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <small className="form-text text-muted">
-                    {courses.length === 0 &&
-                      "No courses found in your department."}
-                  </small>
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Search teacher by username..."
+                    value={filterTeacher}
+                    onChange={(e) => setFilterTeacher(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-3 d-flex justify-content-between align-items-center">
+                  <span className="text-muted small">
+                    Topics assigned:{" "}
+                    <strong>
+                      {selectedTeacherId ? pendingAssignedCount : 0}
+                    </strong>
+                  </span>
+                  {dirty && (
+                    <span className="badge bg-warning text-dark">
+                      Unsaved changes
+                    </span>
+                  )}
                 </div>
 
                 <button
                   className="btn btn-primary w-100"
-                  disabled={teachers.length === 0 || courses.length === 0}
+                  disabled={!selectedTeacherId || saving || !dirty}
                 >
-                  Assign Teacher
+                  {saving ? "Saving..." : "Save Assignment"}
                 </button>
               </form>
             </div>
@@ -194,94 +288,84 @@ const TeacherAssignments = () => {
           {/* Summary Card */}
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-4">
-              <h5 className="fw-bold mb-3">Summary</h5>
+              <h5 className="fw-bold mb-3">
+                {selectedTeacher ? selectedTeacher.username : "Teacher summary"}
+              </h5>
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Total assignments</span>
-                <strong>{assignments.length}</strong>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Unique teachers</span>
-                <strong>{Object.keys(byTeacher).length}</strong>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Courses with assignments</span>
+                <span className="text-muted">Department</span>
                 <strong>
-                  {new Set(assignments.map((a) => a.course)).size}
+                  {selectedTeacher?.department_name ||
+                    selectedTeacher?.department ||
+                    user?.department_name ||
+                    "—"}
                 </strong>
               </div>
+              <div className="d-flex justify-content-between mb-2">
+                <span className="text-muted">Assigned topics</span>
+                <strong>{currentAssignedCount}</strong>
+              </div>
               <div className="d-flex justify-content-between">
-                <span className="text-muted">Available teachers</span>
-                <strong>{teachers.filter((t) => t.is_active).length}</strong>
+                <span className="text-muted">Last updated</span>
+                <strong>{lastUpdated}</strong>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Assignment List */}
+        {/* Topic Checklist */}
         <div className="col-lg-8">
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-4">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5 className="fw-bold mb-0">Current Assignments</h5>
-                <input
-                  className="form-control form-control-sm"
-                  style={{ maxWidth: 220 }}
-                  placeholder="Search teacher..."
-                  value={filterTeacher}
-                  onChange={(e) => setFilterTeacher(e.target.value)}
-                />
+                <h5 className="fw-bold mb-0">
+                  {selectedTeacher
+                    ? `Assigned Topics — ${selectedTeacher.username}`
+                    : "Assigned Topics"}
+                </h5>
+                <span className="text-muted small">
+                  Check the topics this teacher is responsible for.
+                </span>
               </div>
 
-              {filteredTeachers.length === 0 ? (
+              {!selectedTeacherId ? (
                 <p className="text-muted text-center py-4">
-                  No assignments found.
+                  Select a teacher to manage their topic assignments.
+                </p>
+              ) : topicsByDomain.length === 0 ? (
+                <p className="text-muted text-center py-4">
+                  No topics found in your department.
                 </p>
               ) : (
                 <div className="d-grid gap-4">
-                  {filteredTeachers.map(([teacherName, teacherAssignments]) => (
-                    <div key={teacherName}>
+                  {topicsByDomain.map((group) => (
+                    <div key={group.domainName}>
                       <div className="d-flex align-items-center gap-2 mb-2">
-                        <div
-                          className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-                          style={{
-                            width: 36,
-                            height: 36,
-                            fontSize: "0.9rem",
-                          }}
+                        <div className="rounded-circle bg-secondary bg-opacity-25 text-dark d-flex align-items-center justify-content-center fw-bold"
+                          style={{ width: 32, height: 32, fontSize: "0.8rem" }}
                         >
-                          {teacherName.charAt(0).toUpperCase()}
+                          {group.domainName.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="fw-bold mb-0">{teacherName}</p>
-                          <p className="text-muted small mb-0">
-                            {teacherAssignments.length} course(s) assigned
-                          </p>
-                        </div>
+                        <h6 className="fw-bold mb-0">{group.domainName}</h6>
                       </div>
 
                       <div className="d-grid gap-2 ps-4">
-                        {teacherAssignments.map((a) => (
-                          <div
-                            key={a.id}
-                            className="d-flex justify-content-between align-items-center blueprint-rule-row"
-                          >
-                            <div>
-                              <span className="fw-semibold small">
-                                {a.course_name}
-                              </span>
-                              <p className="text-muted small mb-0">
-                                Assigned{" "}
-                                {new Date(a.assigned_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => deleteAssignment(a.id)}
+                        {group.topics.map((t) => {
+                          const checked = Boolean(pendingState[t.id]);
+                          return (
+                            <label
+                              key={t.id}
+                              className="d-flex align-items-center gap-2 blueprint-rule-row"
                             >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={checked}
+                                onChange={() => toggleTopic(t.id)}
+                              />
+                              <span className="fw-semibold small">{t.name}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

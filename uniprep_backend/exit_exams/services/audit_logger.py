@@ -84,3 +84,17 @@ def snapshot_assignment(assignment) -> dict:
         "course_id": assignment.course_id,
         "course_name": assignment.course.name,
     }
+
+
+def snapshot_topic_assignment(assignment) -> dict:
+    """Return a lightweight dict snapshot of a TeacherTopicAssignment."""
+    return {
+        "id": assignment.id,
+        "teacher_id": assignment.teacher_id,
+        "teacher_username": assignment.teacher.username,
+        "topic_id": assignment.topic_id,
+        "topic_name": assignment.topic.name,
+        "domain_name": assignment.topic.domain.name,
+        "course_name": assignment.topic.domain.course.name,
+        "active": assignment.active,
+    }

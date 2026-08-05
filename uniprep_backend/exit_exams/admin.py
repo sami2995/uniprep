@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
-    Department, Course, TeacherCourseAssignment, Domain, Topic,
+    Department, Course, TeacherCourseAssignment, TeacherTopicAssignment,
+    Domain, Topic,
     Question, Choice, MockExam, MockExamQuestion, ExamAttempt,
     AttemptDetail, ExamPdfImport, ExtractedQuestion, ExamBlueprint,
     ExamBlueprintDomainRule, AuditLog, SystemSettings,
@@ -45,6 +46,28 @@ class TeacherCourseAssignmentAdmin(admin.ModelAdmin):
 
     def department_name(self, obj):
         return obj.course.department.name if obj.course.department else "-"
+
+
+@admin.register(TeacherTopicAssignment)
+class TeacherTopicAssignmentAdmin(admin.ModelAdmin):
+    list_display = [
+        "teacher_username", "topic_name", "domain_name",
+        "course_name", "active", "assigned_at",
+    ]
+    list_filter = ["active", "topic__domain__course__department", "topic__domain__course"]
+    search_fields = ["teacher__username", "topic__name", "topic__domain__name"]
+
+    def teacher_username(self, obj):
+        return obj.teacher.username
+
+    def topic_name(self, obj):
+        return obj.topic.name
+
+    def domain_name(self, obj):
+        return obj.topic.domain.name
+
+    def course_name(self, obj):
+        return obj.topic.domain.course.name
 
 
 @admin.register(Domain)

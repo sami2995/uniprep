@@ -7,7 +7,9 @@ from .models import (
     MaterialSummary,
     GeneratedFlashcard,
     GeneratedQuiz,
-    GeneratedQuizQuestion
+    GeneratedQuizQuestion,
+    MaterialQuizAttempt,
+    MaterialQuizAnswer,
 )
 
 
@@ -97,14 +99,52 @@ class GeneratedQuizQuestionSerializer(
         fields = "__all__"
 
 
+class GeneratedQuizQuestionFetchSerializer(
+    serializers.ModelSerializer
+):
+    """Student-facing quiz question serializer.
+
+    Omits ``correct_answer`` and ``explanation`` so that the correct
+    answer / reasoning are not shipped to the client before the student
+    has actually submitted their attempt. Scoring is performed
+    authoritatively on the backend at submit time.
+    """
+
+    class Meta:
+        model = GeneratedQuizQuestion
+        fields = ["id", "question_text", "choices"]
+
+
 class GeneratedQuizSerializer(
     serializers.ModelSerializer
 ):
-    questions = GeneratedQuizQuestionSerializer(
-        many=True,
-        read_only=True
-    )
+    questions = serializers.SerializerMethodField()
 
     class Meta:
         model = GeneratedQuiz
+        fields = "__all__"
+
+    def get_questions(self, obj):
+        include_answers = self.context.get("include_answers", True)
+        qs = obj.questions.all()
+        if include_answers:
+            return GeneratedQuizQuestionSerializer(qs, many=True).data
+        return GeneratedQuizQuestionFetchSerializer(qs, many=True).data
+
+
+class MaterialQuizAnswerSerializer(
+    serializers.ModelSerializer
+):
+    class Meta:
+        model = MaterialQuizAnswer
+        fields = "__all__"
+
+
+class MaterialQuizAttemptSerializer(
+    serializers.ModelSerializer
+):
+    answers = MaterialQuizAnswerSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = MaterialQuizAttempt
         fields = "__all__"

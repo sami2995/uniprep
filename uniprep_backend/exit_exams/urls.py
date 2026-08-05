@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     DepartmentViewSet, CourseViewSet, TeacherCourseAssignmentViewSet,
+    TeacherTopicAssignmentViewSet,
     DomainViewSet, TopicViewSet, QuestionViewSet,
     ChoiceViewSet, MockExamViewSet, MockExamQuestionViewSet,
     ExamAttemptViewSet, AttemptDetailViewSet, generate_mock_exam, submit_mock_exam,
@@ -10,7 +11,7 @@ from .views import (
     my_exam_results, exam_result_detail, admin_dashboard_stats, reject_extracted_question,
     auto_classify_extracted_questions, bulk_approve_extracted_questions,
     submit_extracted_questions_for_approval,
-    question_availability_by_domain, my_assigned_courses,
+    question_availability_by_domain, my_assigned_courses, my_assigned_topics,
     submit_question_for_approval, pending_question_approvals, approve_question, reject_question,
     # Phase 2
     check_question_duplicate,
@@ -30,6 +31,11 @@ router.register(
     TeacherCourseAssignmentViewSet,
     basename="teacher-course-assignments"
 )
+router.register(
+    "teacher-topic-assignments",
+    TeacherTopicAssignmentViewSet,
+    basename="teacher-topic-assignments"
+)
 router.register("domains", DomainViewSet)
 router.register("topics", TopicViewSet)
 router.register("questions", QuestionViewSet)
@@ -44,8 +50,10 @@ router.register("exam-blueprints", ExamBlueprintViewSet, basename="exam-blueprin
 router.register("exam-blueprint-rules", ExamBlueprintDomainRuleViewSet, basename="exam-blueprint-rules")
 
 urlpatterns = [
-    # Teacher course assignment (teacher sees own courses)
+    # Teacher course assignment (teacher sees own courses) — legacy, kept for backward compatibility
     path("my-assigned-courses/", my_assigned_courses, name="my-assigned-courses"),
+    # Teacher topic assignment (teacher sees assigned topics) — canonical
+    path("my-assigned-topics/", my_assigned_topics, name="my-assigned-topics"),
 
     # Question workflow
     path("questions/pending-approvals/", pending_question_approvals, name="pending-question-approvals"),

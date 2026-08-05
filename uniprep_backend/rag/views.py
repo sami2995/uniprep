@@ -14,6 +14,8 @@ from .models import (
     GeneratedFlashcard,
     GeneratedQuiz,
     GeneratedQuizQuestion,
+    MaterialQuizAttempt,
+    MaterialQuizAnswer,
 )
 
 from .serializers import (
@@ -32,7 +34,6 @@ from .services.text_processor import (
     extract_text_from_docx,
     chunk_text,
     generate_local_chunk_id,
-    create_basic_summary,
 )
 
 from .services.embedding_service import generate_embedding
@@ -42,13 +43,79 @@ from .services.qdrant_service import (
     search_similar_chunks
 )
 from .services.ai_service import (
+    InsufficientQuizMaterialError,
     generate_rag_answer,
     generate_flashcards_ai,
     generate_quiz_ai,
+    generate_summary_ai,
+    generate_summary_map_reduce,
+    MAX_SUMMARY_CONTEXT_CHUNKS,
+    MIN_SUMMARY_TEXT_LEN,
 )
 
 
 ADMIN_ROLES = {"department_head", "system_admin", "admin"}
+
+
+def _quiz_viewer_is_privileged(user):
+    """Whether the requesting user may see quiz correct answers pre-submit.
+
+    Teachers and admins legitimately preview a generated quiz's correct
+    answers (TeacherMaterialDetail quiz preview). Students must NOT see
+    them before submitting their attempt, so the spoiler fields are
+    stripped from student-facing quiz-fetch / generate responses and only
+    revealed by the submit / review endpoints afterwards.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        getattr(user, "is_staff", False)
+        or getattr(user, "role", "") in ADMIN_ROLES
+        or getattr(user, "role", "") == "teacher"
+    )
+
+
+def _serialize_material_quiz_attempt(attempt, include_answers=True):
+    """Stable payload shape for the submit and review- attempt endpoints.
+
+    Returns per-question result entries only for questions the student
+    actually answered (i.e. rows that exist). Unanswered questions are
+    absent from ``answers``; the caller derives them from the full quiz
+    question list. ``include_answers`` controls whether ``correct_answer``
+    and ``explanation`` are exposed (always True: this payload is the
+    post-submission review, so revealing answers is intended).
+    """
+    answers_payload = []
+    for answer in attempt.answers.all().order_by("answered_at"):
+        question = answer.question
+        entry = {
+            "question_id": answer.question_id,
+            "selected_answer": answer.selected_answer,
+            "is_correct": answer.is_correct,
+            "confidence": answer.confidence,
+            "answered": True,
+            "correct_answer": "",
+            "explanation": "",
+        }
+        if include_answers:
+            if question is not None:
+                entry["correct_answer"] = question.correct_answer
+            entry["explanation"] = answer.explanation_shown
+        answers_payload.append(entry)
+
+    return {
+        "attempt_id": attempt.id,
+        "quiz_id": attempt.quiz_id,
+        "status": attempt.status,
+        "total_score": attempt.total_score,
+        "submitted_at": attempt.submitted_at,
+        "total_questions": attempt.quiz.questions.count(),
+        "correct_count": sum(1 for a in answers_payload if a["is_correct"]),
+        "wrong_count": sum(1 for a in answers_payload if not a["is_correct"]),
+        "answered_count": len(answers_payload),
+        "unanswered_count": attempt.quiz.questions.count() - len(answers_payload),
+        "answers": answers_payload,
+    }
 
 
 def invalidate_material_artifacts(material):
@@ -119,6 +186,20 @@ class StudyMaterialViewSet(viewsets.ModelViewSet):
         return StudyMaterial.objects.filter(owner=user)
 
     def perform_create(self, serializer):
+        user = self.request.user
+
+        # Teachers may publish study materials only for topics assigned to them.
+        if getattr(user, "role", None) == "teacher":
+            from exit_exams.models import TeacherTopicAssignment
+            topic = serializer.validated_data.get("topic")
+            if topic is not None and not TeacherTopicAssignment.objects.filter(
+                teacher=user, topic=topic, active=True
+            ).exists():
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(
+                    "Teachers can publish study materials only for assigned topics."
+                )
+
         serializer.save(owner=self.request.user)
 
 
@@ -383,25 +464,65 @@ def generate_material_summary(request, material_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    combined_text = "\n".join(
-        chunk.chunk_text
-        for chunk in chunks[:5]
-    )
+    # Use the FULL document, not just the first few chunks. The previous
+    # implementation sliced to chunks[:5], silently dropping everything
+    # past ~1-2 pages of source material.
+    context_chunks = [chunk.chunk_text for chunk in chunks]
 
-    summary_text = create_basic_summary(combined_text)
+    ai_status = "ai_generated"
+    ai_error = None
 
-    key_points = [
-        line.strip()
-        for line in summary_text.split(".")
-        if len(line.strip()) > 30
-    ][:5]
+    summary_text = ""
+    key_points = []
+    important_terms = []
+
+    try:
+        if len(context_chunks) <= MAX_SUMMARY_CONTEXT_CHUNKS:
+            result = generate_summary_ai(context_chunks, mode="full")
+        else:
+            result = generate_summary_map_reduce(context_chunks)
+
+        summary_text = result.get("summary_text", "").strip()
+        key_points = result.get("key_points", []) or []
+        important_terms = result.get("important_terms", []) or []
+
+        # Simple content validation: non-empty, reasonable length, not a
+        # refusal. One retry, then degrade gracefully if still invalid.
+        if not summary_text or len(summary_text) < MIN_SUMMARY_TEXT_LEN:
+            retry_result = (
+                generate_summary_map_reduce(context_chunks)
+                if len(context_chunks) > MAX_SUMMARY_CONTEXT_CHUNKS
+                else generate_summary_ai(context_chunks, mode="full")
+            )
+            summary_text = retry_result.get("summary_text", "").strip()
+            key_points = retry_result.get("key_points", []) or []
+            important_terms = retry_result.get("important_terms", []) or []
+
+            if not summary_text or len(summary_text) < MIN_SUMMARY_TEXT_LEN:
+                raise ValueError("Summary too short or empty after retry.")
+
+    except Exception as ai_exception:
+        # Graceful fallback: build a clearly-labeled degraded summary
+        # from the retrieved chunks themselves, so the endpoint never
+        # hard-crashes. Mirrors the ask_material_question fallback shape.
+        preview_chunks = context_chunks[:5]
+        preview = "\n\n".join(preview_chunks)[:2000]
+        summary_text = (
+            "An accurate summary could not be generated at this time. "
+            "Below is an extract from the beginning of the material.\n\n"
+            f"{preview}"
+        )
+        key_points = []
+        important_terms = []
+        ai_status = "fallback_from_retrieved_chunks"
+        ai_error = str(ai_exception)
 
     summary, created = MaterialSummary.objects.update_or_create(
         material=material,
         defaults={
             "summary_text": summary_text,
             "key_points": key_points,
-            "important_terms": [],
+            "important_terms": important_terms,
         },
     )
 
@@ -410,6 +531,8 @@ def generate_material_summary(request, material_id):
             "message": "Summary generated successfully.",
             "material_id": material.id,
             "title": material.title,
+            "ai_status": ai_status,
+            "ai_error": ai_error,
             "summary": {
                 "id": summary.id,
                 "summary_text": summary.summary_text,
@@ -420,6 +543,7 @@ def generate_material_summary(request, material_id):
         },
         status=status.HTTP_200_OK,
     )
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def ask_material_question(request, material_id):
@@ -667,6 +791,28 @@ def generate_material_flashcards(request, material_id):
         },
         status=status.HTTP_200_OK
     )
+MIN_QUIZ_QUESTION_COUNT = 1
+MAX_QUIZ_QUESTION_COUNT = 30
+DEFAULT_QUIZ_QUESTION_COUNT = 5
+
+# Maximum number of context chunks fed to the quiz prompt.
+MAX_QUIZ_CONTEXT_CHUNKS = 20
+
+
+class QuizQuestionCountMismatchError(Exception):
+    """Internal safety net: stored question count did not match the request."""
+
+
+def parse_quiz_question_count(raw_value):
+    """
+    Returns a valid question count, or None if the value is missing/invalid.
+    """
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def generate_material_quiz(request, material_id):
@@ -690,11 +836,32 @@ def generate_material_quiz(request, material_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    count = int(request.data.get("count", 5))
+    raw_count = request.data.get(
+        "question_count",
+        request.data.get("count", DEFAULT_QUIZ_QUESTION_COUNT)
+    )
+    count = parse_quiz_question_count(raw_count)
+
+    if count is None or not (
+        MIN_QUIZ_QUESTION_COUNT <= count <= MAX_QUIZ_QUESTION_COUNT
+    ):
+        return Response(
+            {
+                "detail": (
+                    f"question_count must be an integer between "
+                    f"{MIN_QUIZ_QUESTION_COUNT} and {MAX_QUIZ_QUESTION_COUNT}."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Larger requests need more source material to draw distinct
+    # questions from; scale the context window with the count.
+    chunk_limit = min(max(8, count), MAX_QUIZ_CONTEXT_CHUNKS)
 
     chunks = DocumentChunk.objects.filter(
         material=material
-    ).order_by("chunk_index")[:8]
+    ).order_by("chunk_index")[:chunk_limit]
 
     if not chunks:
         return Response(
@@ -713,6 +880,16 @@ def generate_material_quiz(request, material_id):
             count=count
         )
 
+    except InsufficientQuizMaterialError as e:
+        return Response(
+            {
+                "detail": str(e),
+                "requested_count": e.requested,
+                "supported_count": e.supported,
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     except Exception as e:
         quiz_data = create_fallback_quiz_from_chunks(
             chunks=context_chunks,
@@ -721,42 +898,87 @@ def generate_material_quiz(request, material_id):
         ai_status = "fallback_generated"
         ai_error = str(e)
 
-    with transaction.atomic():
-        quiz = GeneratedQuiz.objects.create(
-            student=user,
-            material=material,
-            title=f"Quiz from {material.title}"
-        )
-
-        created_questions = []
-
-        for item in quiz_data[:count]:
-            question_text = item.get("question_text", "").strip()
-            choices = item.get("choices", [])
-            correct_answer = item.get("correct_answer", "").strip()
-            explanation = item.get("explanation", "").strip()
-
-            if not question_text or not choices or not correct_answer:
-                continue
-
-            if len(choices) != 4:
-                continue
-
-            quiz_question = GeneratedQuizQuestion.objects.create(
-                quiz=quiz,
-                question_text=question_text,
-                choices=choices,
-                correct_answer=correct_answer,
-                explanation=explanation
+        if len(quiz_data) < count:
+            return Response(
+                {
+                    "detail": (
+                        f"AI quiz generation is currently unavailable, and "
+                        f"the fallback generator can only produce "
+                        f"{len(quiz_data)} question(s) from this material, "
+                        f"but {count} were requested. Please try again "
+                        f"later or request fewer questions."
+                    ),
+                    "requested_count": count,
+                    "supported_count": len(quiz_data),
+                    "ai_status": ai_status,
+                    "ai_error": ai_error,
+                },
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-            created_questions.append({
-                "id": quiz_question.id,
-                "question_text": quiz_question.question_text,
-                "choices": quiz_question.choices,
-                "correct_answer": quiz_question.correct_answer,
-                "explanation": quiz_question.explanation
-            })
+    try:
+        with transaction.atomic():
+            quiz = GeneratedQuiz.objects.create(
+                student=user,
+                material=material,
+                title=f"Quiz from {material.title}"
+            )
+
+            created_questions = []
+
+            for item in quiz_data[:count]:
+                question_text = item.get("question_text", "").strip()
+                choices = item.get("choices", [])
+                correct_answer = item.get("correct_answer", "").strip()
+                explanation = item.get("explanation", "").strip()
+
+                if not question_text or not choices or not correct_answer:
+                    continue
+
+                if len(choices) != 4:
+                    continue
+
+                quiz_question = GeneratedQuizQuestion.objects.create(
+                    quiz=quiz,
+                    question_text=question_text,
+                    choices=choices,
+                    correct_answer=correct_answer,
+                    explanation=explanation
+                )
+
+                question_payload = {
+                    "id": quiz_question.id,
+                    "question_text": quiz_question.question_text,
+                    "choices": quiz_question.choices,
+                }
+                # Only reveal correct_answer/explanation to privileged
+                # viewers (teachers/admins previewing the quiz). Students
+                # never see these pre-submit; they are returned by the
+                # submit and review endpoints after the attempt is scored.
+                if _quiz_viewer_is_privileged(user):
+                    question_payload["correct_answer"] = quiz_question.correct_answer
+                    question_payload["explanation"] = quiz_question.explanation
+
+                created_questions.append(question_payload)
+
+            if len(created_questions) != count:
+                raise QuizQuestionCountMismatchError(
+                    f"Expected to store {count} questions, "
+                    f"stored {len(created_questions)}."
+                )
+
+    except QuizQuestionCountMismatchError as e:
+        return Response(
+            {
+                "detail": (
+                    "Failed to generate the exact number of questions "
+                    "requested. Please try again."
+                ),
+                "requested_count": count,
+                "ai_error": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     return Response(
         {
@@ -764,6 +986,8 @@ def generate_material_quiz(request, material_id):
             "material_id": material.id,
             "title": material.title,
             "quiz_id": quiz.id,
+            "requested_count": count,
+            "question_count": len(created_questions),
             "ai_status": ai_status,
             "ai_error": ai_error,
             "questions": created_questions
@@ -795,8 +1019,28 @@ def get_material_quiz(request, material_id):
     ).order_by("-created_at").first()
 
     if quiz:
-        serializer = GeneratedQuizSerializer(quiz)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        include_answers = _quiz_viewer_is_privileged(user)
+        serializer = GeneratedQuizSerializer(
+            quiz,
+            context={"include_answers": include_answers}
+        )
+        data = dict(serializer.data)
+
+        # Attach the student's most recent completed attempt so a reopen
+        # shows previous results instead of a blank quiz (mirrors the
+        # persisted-artifact pattern used for summaries/flashcards/chat).
+        latest_attempt = (
+            MaterialQuizAttempt.objects.filter(quiz=quiz, student=user)
+            .order_by("-submitted_at")
+            .first()
+        )
+        if latest_attempt is not None:
+            data["latest_attempt"] = _serialize_material_quiz_attempt(
+                latest_attempt,
+                include_answers=True
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
 
     return Response({"quiz": None}, status=status.HTTP_200_OK)
 
@@ -831,3 +1075,192 @@ def get_material_chat(request, material_id):
         return Response({"messages": messages}, status=status.HTTP_200_OK)
 
     return Response({"messages": []}, status=status.HTTP_200_OK)
+
+
+def _resolve_material_for_user(user, material_id):
+    """Resolve a StudyMaterial for the requesting user or raise DoesNotExist.
+
+    Privileged viewers (staff / admin roles / teachers) may access any
+    material; everyone else only their own.
+    """
+    if user.is_staff or user.role in ADMIN_ROLES:
+        return StudyMaterial.objects.get(id=material_id)
+    return StudyMaterial.objects.get(id=material_id, owner=user)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_material_quiz(request, material_id):
+    """Score a per-material practice quiz attempt authoritatively.
+
+    Request body: { quiz_id, answers: [{ question_id, selected_answer, confidence }] }
+
+    - Scoring is performed server-side by comparing the submitted
+      ``selected_answer`` to the stored ``GeneratedQuizQuestion.correct_answer``.
+      The frontend's idea of correctness is NOT trusted.
+    - A MaterialQuizAnswer row is created ONLY for questions present in the
+      submitted ``answers`` array. Skipped questions get no row; an absent row
+      means "unanswered" (never a stored "wrong").
+    - ``explanation_shown`` is snapshotted from the question at submission time
+      so historical attempts survive later quiz regeneration / question edits.
+    - The ``question`` FK uses SET_NULL, so regenerating a quiz does not
+      silently destroy historical answers.
+
+    total_score is computed as percentage correct out of TOTAL questions in
+    the quiz (skipping costs you), consistent with Exit Exam scoring intent.
+    Each submission creates a NEW MaterialQuizAttempt (history, not overwrite).
+    """
+    user = request.user
+
+    try:
+        material = _resolve_material_for_user(user, material_id)
+    except StudyMaterial.DoesNotExist:
+        return Response(
+            {"detail": "Study material not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    quiz_id = request.data.get("quiz_id")
+    answers = request.data.get("answers", [])
+
+    if not quiz_id:
+        return Response(
+            {"detail": "quiz_id is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not isinstance(answers, list):
+        return Response(
+            {"detail": "answers must be a list."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    quiz = None
+    try:
+        quiz = GeneratedQuiz.objects.get(id=quiz_id, material=material)
+    except GeneratedQuiz.DoesNotExist:
+        return Response(
+            {"detail": "Quiz not found for this material."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # A student may only submit their own quiz's attempt. Privileged
+    # viewers (teachers/admins) would not submit student quizzes, but we
+    # still gate on ownership for safety.
+    if quiz.student_id != user.id and not _quiz_viewer_is_privileged(user):
+        return Response(
+            {"detail": "You do not have permission to submit this quiz."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    total_questions = quiz.questions.count()
+
+    # Build a lookup of the questions that this quiz actually owns, keyed
+    # by id, so submitted answers can be validated and scored.
+    own_question_ids = set(quiz.questions.values_list("id", flat=True))
+
+    # MaterialQuizAnswer.unique_together = (attempt, question) -> dedupe
+    # any duplicate question_id in the submission to one entry (last wins).
+    answers_by_question = {}
+    for entry in answers:
+        if not isinstance(entry, dict):
+            continue
+        qid = entry.get("question_id")
+        if qid is None:
+            continue
+        try:
+            qid = int(qid)
+        except (TypeError, ValueError):
+            continue
+        if qid not in own_question_ids:
+            continue
+        selected_answer = entry.get("selected_answer")
+        if selected_answer is None:
+            selected_answer = ""
+        answers_by_question[qid] = {
+            "selected_answer": str(selected_answer),
+            "confidence": str(entry.get("confidence", "") or ""),
+        }
+
+    correct_count = 0
+
+    with transaction.atomic():
+        attempt = MaterialQuizAttempt.objects.create(
+            quiz=quiz,
+            student=user,
+            status="completed",
+            total_score=0,
+        )
+
+        for qid, payload in answers_by_question.items():
+            question = GeneratedQuizQuestion.objects.get(id=qid)
+            is_correct = payload["selected_answer"] == question.correct_answer
+            if is_correct:
+                correct_count += 1
+            MaterialQuizAnswer.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_answer=payload["selected_answer"],
+                is_correct=is_correct,
+                confidence=payload["confidence"],
+                explanation_shown=question.explanation,
+            )
+
+        total_score = (
+            round((correct_count / total_questions) * 100, 2)
+            if total_questions else 0.0
+        )
+        attempt.total_score = total_score
+        attempt.save(update_fields=["total_score"])
+
+    attempt.refresh_from_db()
+    return Response(
+        _serialize_material_quiz_attempt(attempt, include_answers=True),
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_material_quiz_attempt(request, material_id, attempt_id):
+    """Return a stored past per-material quiz attempt for review.
+
+    Returns the same shape as the submit endpoint so the frontend can
+    render a past attempt's results after the fact. Attempts are stored
+    as history; this retrieves a specific attempt by id.
+    """
+    user = request.user
+
+    try:
+        material = _resolve_material_for_user(user, material_id)
+    except StudyMaterial.DoesNotExist:
+        return Response(
+            {"detail": "Study material not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    attempt = (
+        MaterialQuizAttempt.objects
+        .select_related("quiz", "student")
+        .filter(id=attempt_id, quiz__material=material)
+        .first()
+    )
+
+    if attempt is None:
+        return Response(
+            {"detail": "Attempt not found for this material."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # A student may only review their own attempts; privileged viewers
+    # (teachers/admins) may review any attempt on the material.
+    if attempt.student_id != user.id and not _quiz_viewer_is_privileged(user):
+        return Response(
+            {"detail": "You do not have permission to view this attempt."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    return Response(
+        _serialize_material_quiz_attempt(attempt, include_answers=True),
+        status=status.HTTP_200_OK
+    )

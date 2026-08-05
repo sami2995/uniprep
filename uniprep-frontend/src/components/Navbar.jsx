@@ -80,7 +80,7 @@ const Navbar = () => {
                     className="btn btn-outline-primary btn-sm"
                     to="/teacher/courses"
                   >
-                    My Courses
+                    My Teaching Topics
                   </Link>
                   <Link
                     className="btn btn-outline-primary btn-sm"

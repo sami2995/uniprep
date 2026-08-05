@@ -258,3 +258,54 @@ class GeneratedQuizQuestion(models.Model):
 
     def __str__(self):
         return self.question_text[:60]
+
+
+class MaterialQuizAttempt(models.Model):
+    quiz = models.ForeignKey(
+        GeneratedQuiz,
+        on_delete=models.CASCADE,
+        related_name="attempts"
+    )
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="material_quiz_attempts"
+    )
+
+    status = models.CharField(max_length=20, default="completed")
+    total_score = models.FloatField(default=0)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-submitted_at"]
+
+    def __str__(self):
+        return f"{self.student.username} - attempt {self.id} on quiz {self.quiz_id}"
+
+
+class MaterialQuizAnswer(models.Model):
+    attempt = models.ForeignKey(
+        MaterialQuizAttempt,
+        on_delete=models.CASCADE,
+        related_name="answers"
+    )
+
+    question = models.ForeignKey(
+        GeneratedQuizQuestion,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="answers"
+    )
+
+    selected_answer = models.CharField(max_length=255, blank=True)
+    is_correct = models.BooleanField(default=False)
+    confidence = models.CharField(max_length=20, blank=True)
+    explanation_shown = models.TextField(blank=True)
+    answered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("attempt", "question")
+
+    def __str__(self):
+        return f"answer {self.id} (attempt {self.attempt_id})"
