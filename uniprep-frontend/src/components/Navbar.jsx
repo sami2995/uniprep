@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { normalizeRole, getDefaultPathForRole } from "../routes/roleRoutes";
 import NotificationBell from "./NotificationBell";
@@ -6,6 +6,10 @@ import NotificationBell from "./NotificationBell";
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDarkPublicPage = ["/", "/login", "/register"].includes(
+    location.pathname
+  );
 
   const handleLogout = () => {
     logout();
@@ -22,7 +26,11 @@ const Navbar = () => {
     user && normalizedRole ? getDefaultPathForRole(normalizedRole) : "/";
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+    <nav
+      className={`navbar navbar-expand-lg border-bottom ${
+        isDarkPublicPage ? "navbar-dark navbar-lp-dark" : "navbar-light bg-white"
+      }`}
+    >
       <div className="container">
         <Link className="navbar-brand fw-bold text-primary" to={brandTo}>
           UniPrep AI

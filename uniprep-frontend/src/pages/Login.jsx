@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { GraduationCap } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { getDefaultPathForRole } from "../routes/roleRoutes";
 
@@ -39,48 +40,60 @@ const Login = () => {
   };
 
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-md-5">
-          <div className="card shadow-sm border-0 rounded-4">
-            <div className="card-body p-4">
-              <h3 className="fw-bold mb-3">Login</h3>
-
-              {error && <div className="alert alert-danger">{error}</div>}
-
-              <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label className="form-label">Username</label>
-                  <input
-                    type="text"
-                    name="username"
-                    className="form-control"
-                    value={form.username}
-                    onChange={handleChange}
-                    required
-                  />
+    <div className="auth-page">
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-5">
+            <div className="card auth-card shadow-sm border-0 rounded-4">
+              <div className="card-body p-4">
+                <div className="auth-brand mb-4">
+                  <span className="auth-brand-icon" aria-hidden="true">
+                    <GraduationCap size={20} />
+                  </span>
+                  <span className="auth-brand-name">UniPrep AI</span>
                 </div>
 
-                <div className="mb-3">
-                  <label className="form-label">Password</label>
-                  <input
-                    type="password"
-                    name="password"
-                    className="form-control"
-                    value={form.password}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
+                <h3 className="fw-bold mb-1 auth-title">Welcome back</h3>
+                <p className="auth-subtitle mb-4">
+                  Log in to continue your Exit Exam prep.
+                </p>
 
-                <button className="btn btn-primary w-100" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
-                </button>
-              </form>
+                {error && <div className="alert alert-danger">{error}</div>}
 
-              <p className="small text-muted mt-3">
-                No account? <Link to="/register">Register here</Link>
-              </p>
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3">
+                    <label className="form-label">Username</label>
+                    <input
+                      type="text"
+                      name="username"
+                      className="form-control"
+                      value={form.username}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label">Password</label>
+                    <input
+                      type="password"
+                      name="password"
+                      className="form-control"
+                      value={form.password}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+
+                  <button className="btn btn-primary w-100" disabled={loading}>
+                    {loading ? "Logging in..." : "Login"}
+                  </button>
+                </form>
+
+                <p className="small text-muted mt-3 mb-0">
+                  No account? <Link to="/register">Register here</Link>
+                </p>
+              </div>
             </div>
           </div>
         </div>

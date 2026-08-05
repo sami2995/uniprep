@@ -263,45 +263,55 @@ const StudentFocus = () => {
         </div>
 
         <div className="col-lg-5">
-          <div className="row g-3">
-            <div className="col-12">
-              <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body">
-                  <h6 className="text-muted">Today Focus</h6>
-                  <h2 className="fw-bold">{todayMinutes} min</h2>
-                  <p className="small text-muted mb-0">
-                    Total study minutes today
-                  </p>
+          <div className="card border-0 shadow-sm rounded-4 h-100">
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-4">Your Progress</h5>
+
+              <div className="row g-3 text-center">
+                <div className="col-4">
+                  <div className="focus-stat-block">
+                    <h3 className="fw-bold mb-0 text-primary">
+                      {todayMinutes}
+                    </h3>
+                    <small className="text-muted d-block">min today</small>
+                  </div>
+                </div>
+
+                <div className="col-4">
+                  <div className="focus-stat-block">
+                    <h3 className="fw-bold mb-0 text-success">
+                      {weekMinutes}
+                    </h3>
+                    <small className="text-muted d-block">min this week</small>
+                  </div>
+                </div>
+
+                <div className="col-4">
+                  <div className="focus-stat-block">
+                    <h3 className="fw-bold mb-0 text-warning">
+                      {totalSessions}
+                    </h3>
+                    <small className="text-muted d-block">sessions done</small>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="col-12">
-              <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body">
-                  <h6 className="text-muted">This Week</h6>
-                  <h2 className="fw-bold">{weekMinutes} min</h2>
-                  <p className="small text-muted mb-0">
-                    Weekly study progress
-                  </p>
-                </div>
-              </div>
-            </div>
+              <hr className="my-4" />
 
-            <div className="col-12">
-              <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body">
-                  <h6 className="text-muted">Completed Sessions</h6>
-                  <h2 className="fw-bold">{totalSessions}</h2>
-                  <p className="small text-muted mb-0">
-                    Number of completed focus sessions
-                  </p>
-                </div>
+              <div className="d-flex justify-content-between align-items-center">
+                <span className="text-muted small">Weekly average</span>
+                <strong className="text-dark">
+                  {averageSessionMinutes} min/session
+                </strong>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="card border-0 shadow-sm rounded-4 mt-3">
+      <div className="row g-4 mt-0">
+        <div className="col-lg-4">
+          <div className="card border-0 shadow-sm rounded-4 h-100">
             <div className="card-body">
               <h5 className="fw-bold">Productivity Tip</h5>
               <p className="text-muted mb-0">
@@ -310,8 +320,10 @@ const StudentFocus = () => {
               </p>
             </div>
           </div>
+        </div>
 
-          <div className="card border-0 shadow-sm rounded-4 mt-3">
+        <div className="col-lg-4">
+          <div className="card border-0 shadow-sm rounded-4 h-100">
             <div className="card-body">
               <h5 className="fw-bold mb-3">Recent Study Sessions</h5>
 
@@ -321,7 +333,7 @@ const StudentFocus = () => {
                 </p>
               ) : (
                 <div className="d-grid gap-3">
-                  {summary?.recent_sessions?.map((session) => (
+                  {summary?.recent_sessions?.slice(0, 4).map((session) => (
                     <div key={session.id} className="focus-session-item">
                       <div>
                         <strong>
@@ -342,8 +354,10 @@ const StudentFocus = () => {
               )}
             </div>
           </div>
+        </div>
 
-          <div className="card border-0 shadow-sm rounded-4 mt-3 weekly-report-card">
+        <div className="col-lg-4">
+          <div className="card border-0 shadow-sm rounded-4 h-100 weekly-report-card">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div>

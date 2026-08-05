@@ -4,9 +4,12 @@ import {
   ArrowDown,
   ArrowRight,
   Gauge,
+  GraduationCap,
   LibraryBig,
   ShieldCheck,
+  Sparkles,
   Target,
+  TrendingUp,
 } from "lucide-react";
 
 // ---- Content, separated from markup so it's easy to update or wire to real data ----
@@ -32,6 +35,13 @@ const features = [
     title: "Readiness tracking",
     text: "Multi-level analytics show readiness by course, domain, and topic — for students, teachers, and department heads alike.",
   },
+];
+
+// Quick value highlights shown under the hero CTAs.
+const heroPills = [
+  { icon: Sparkles, label: "AI grounded in your own PDFs" },
+  { icon: ShieldCheck, label: "Department-approved question bank" },
+  { icon: TrendingUp, label: "Adaptive readiness tracking" },
 ];
 
 // Static platform facts (not live metrics): the app defines 4 institutional
@@ -81,8 +91,10 @@ const LandingPage = () => {
   return (
     <main className="landing-page pro-landing" ref={pageRef}>
       <section className="lp-hero" aria-labelledby="lp-hero-title">
+        <div className="lp-hero-grid" aria-hidden="true" />
         <div className="lp-hero-glow lp-hero-glow-a" aria-hidden="true" />
         <div className="lp-hero-glow lp-hero-glow-b" aria-hidden="true" />
+        <div className="lp-hero-glow lp-hero-glow-c" aria-hidden="true" />
 
         <div className="container text-center">
           <span className="lp-badge">
@@ -119,6 +131,15 @@ const LandingPage = () => {
               See how it works
               <ArrowDown size={18} aria-hidden="true" />
             </a>
+          </div>
+
+          <div className="lp-hero-pills">
+            {heroPills.map(({ icon: PillIcon, label }) => (
+              <span key={label} className="lp-pill">
+                <PillIcon size={15} aria-hidden="true" />
+                {label}
+              </span>
+            ))}
           </div>
         </div>
       </section>
@@ -173,6 +194,16 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      <footer className="lp-footer">
+        <div className="container lp-footer-inner">
+          <span className="lp-footer-brand">
+            <GraduationCap size={16} aria-hidden="true" />
+            UniPrep AI
+          </span>
+          <span>Built for Ethiopian university Exit Exams</span>
+        </div>
+      </footer>
     </main>
   );
 };

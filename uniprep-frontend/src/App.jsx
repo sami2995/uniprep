@@ -1,4 +1,11 @@
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import SidebarLayout from "./components/SidebarLayout";
@@ -57,7 +64,20 @@ import BattleLobby from "./pages/BattleLobby";
 import BattlePlay from "./pages/BattlePlay";
 import BattleResults from "./pages/BattleResults";
 
+import Notifications from "./pages/Notifications";
+import { NotificationProvider } from "./notifications/NotificationContext";
+import { Toaster } from "react-hot-toast";
+
 const PublicLayout = ({ children }) => {
+  const location = useLocation();
+
+  // Dark page chrome (body background) for the marketing/auth pages.
+  useEffect(() => {
+    const dark = ["/", "/login", "/register"].includes(location.pathname);
+    document.body.classList.toggle("public-dark-body", dark);
+    return () => document.body.classList.remove("public-dark-body");
+  }, [location.pathname]);
+
   return (
     <>
       <Navbar />
@@ -111,7 +131,8 @@ const RoleLayout = ({ children, roles }) => {
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <NotificationProvider>
+        <Routes>
         {/* Public pages */}
         <Route
           path="/"
@@ -141,6 +162,17 @@ function App() {
         />
 
         <Route path="/dashboard" element={<DashboardRedirect />} />
+
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <SidebarLayout>
+                <Notifications />
+              </SidebarLayout>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/profile"
@@ -498,6 +530,8 @@ function App() {
           }
         />
       </Routes>
+      <Toaster position="bottom-right" />
+      </NotificationProvider>
     </BrowserRouter>
   );
 }
