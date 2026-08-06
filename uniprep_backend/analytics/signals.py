@@ -1,8 +1,12 @@
+import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import Notification
 from .serializers import NotificationSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def _get_channel_layer():
@@ -29,7 +33,13 @@ def broadcast_notification(sender, instance, created, **kwargs):
     payload = NotificationSerializer(instance).data
     group_name = f"notifications_{instance.student_id}"
 
-    async_to_sync(channel_layer.group_send)(
-        group_name,
-        {"type": "notification.new", "payload": payload},
-    )
+    try:
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {"type": "notification.new", "payload": payload},
+        )
+    except Exception as broadcast_error:
+        logger.warning(
+            "Notification broadcast failed (non-fatal): %s",
+            broadcast_error,
+        )

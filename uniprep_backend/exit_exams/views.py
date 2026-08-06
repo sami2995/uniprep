@@ -1,5 +1,8 @@
 from .permissions import IsAdminRole, IsAdminOrReadOnly, IsDepartmentHeadOrSystemAdmin, IsSystemAdminOnly, IsSystemAdminOrReadOnly
+import logging
 import random
+
+logger = logging.getLogger(__name__)
 
 from django.db import transaction
 from django.utils import timezone
@@ -1771,16 +1774,22 @@ def generate_mock_exam(request):
                 order=index
             )
 
-    notify_user(
-        user,
-        title=f"Mock Exam Ready: {mock_exam.title}",
-        message=(
-            f"Your mock exam \"{mock_exam.title}\" "
-            f"({mock_exam.total_questions} questions) is ready to take."
-        ),
-        notification_type=Notification.NotificationType.MOCK_AVAILABLE,
-        target_url=f"/student/exam/{mock_exam.id}",
-    )
+    try:
+        notify_user(
+            user,
+            title=f"Mock Exam Ready: {mock_exam.title}",
+            message=(
+                f"Your mock exam \"{mock_exam.title}\" "
+                f"({mock_exam.total_questions} questions) is ready to take."
+            ),
+            notification_type=Notification.NotificationType.MOCK_AVAILABLE,
+            target_url=f"/student/exam/{mock_exam.id}",
+        )
+    except Exception as notify_error:
+        logger.warning(
+            "Notification failed (non-fatal): %s",
+            notify_error,
+        )
 
     serializer = MockExamDetailSerializer(mock_exam)
 

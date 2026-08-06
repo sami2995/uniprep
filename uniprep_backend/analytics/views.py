@@ -372,7 +372,7 @@ def is_admin_user(user):
 
 
 def get_department_scope(user):
-    if is_department_head_user(user):
+    if is_department_head_user(user) or getattr(user, "role", None) == "student":
         return getattr(user, "department", None)
     return None
 

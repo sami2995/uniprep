@@ -90,6 +90,24 @@ const StudentExams = () => {
     return [];
   };
 
+  useEffect(() => {
+    if ((!courseId || courseId === "") && courses.length > 0) {
+      setCourseId(courses[0].id);
+    }
+  }, [courses, courseId]);
+
+  useEffect(() => {
+    if ((!blueprintId || blueprintId === "") && blueprints.length > 0) {
+      setBlueprintId(blueprints[0].id);
+    }
+  }, [blueprints, blueprintId]);
+
+  useEffect(() => {
+    if ((!selectedWeakTopicId || selectedWeakTopicId === "") && weakTopics.length > 0) {
+      setSelectedWeakTopicId(weakTopics[0].topic_id);
+    }
+  }, [weakTopics, selectedWeakTopicId]);
+
   const startExam = async (e) => {
     e.preventDefault();
     setError("");
@@ -99,18 +117,36 @@ const StudentExams = () => {
       let payload = {};
 
       if (mode === "blueprint") {
-        payload = { blueprint_id: Number(blueprintId) };
+        const targetBlueprintId = blueprintId || (blueprints[0]?.id ?? "");
+        if (!targetBlueprintId) {
+          setError("Please select an official exit exam blueprint.");
+          setLoading(false);
+          return;
+        }
+        payload = { blueprint_id: Number(targetBlueprintId) };
       } else if (mode === "weak_topic") {
+        const targetTopicId = selectedWeakTopicId || (weakTopics[0]?.topic_id ?? "");
+        if (!targetTopicId || weakTopics.length === 0) {
+          setError("You have no weak topics identified yet. Please take a Practice Mock or Official Exit Exam first!");
+          setLoading(false);
+          return;
+        }
         payload = {
-          topic_id: Number(selectedWeakTopicId),
+          topic_id: Number(targetTopicId),
           total_questions: 5,
           duration_minutes: 15,
         };
       } else {
+        const targetCourseId = courseId || (courses[0]?.id ?? "");
+        if (!targetCourseId) {
+          setError("Please select a course.");
+          setLoading(false);
+          return;
+        }
         payload = {
-          course_id: Number(courseId),
-          total_questions: Number(totalQuestions),
-          duration_minutes: Number(durationMinutes),
+          course_id: Number(targetCourseId),
+          total_questions: Number(totalQuestions || 5),
+          duration_minutes: Number(durationMinutes || 30),
         };
       }
 
@@ -124,6 +160,7 @@ const StudentExams = () => {
     } catch (err) {
       setError(
         err.response?.data?.detail ||
+          err.response?.data?.error ||
           "Failed to generate exam. Check if enough approved questions exist."
       );
     } finally {
