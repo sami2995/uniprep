@@ -2,7 +2,7 @@ import random
 
 from django.db.models import QuerySet
 
-from exit_exams.models import Question, AttemptDetail
+from exit_exams.models import Question, AttemptDetail, SystemSettings
 
 
 DEFAULT_APPROVED_FILTER = {
@@ -194,6 +194,11 @@ def select_questions_for_blueprint(user, blueprint):
     """
     from exit_exams.models import ExamBlueprintTopicRule
 
+    settings = SystemSettings.get_solo()
+    blueprint_question_filter = {}
+    if settings.restrict_blueprint_to_official_questions:
+        blueprint_question_filter["source_type"] = Question.SourceType.IMPORTED
+
     topic_rules = list(
         ExamBlueprintTopicRule.objects.filter(
             blueprint=blueprint
@@ -215,6 +220,24 @@ def select_questions_for_blueprint(user, blueprint):
         raise ValueError("This blueprint has no domain or topic rules.")
 
     # Domain-only blueprint path
+    department = _user_department(user)
+    if not department:
+        raise ValueError("Student has no department assigned; cannot generate blueprint exam.")
+
+    if settings.restrict_blueprint_to_official_questions:
+        official_count = Question.objects.filter(
+            topic__domain__course=blueprint.course,
+            topic__domain__course__department=department,
+            **DEFAULT_APPROVED_FILTER,
+            **blueprint_question_filter,
+        ).count()
+        if official_count < blueprint.total_questions:
+            raise ValueError(
+                "Not enough official exam questions available for this blueprint. "
+                f"Only {official_count} of {blueprint.total_questions} required "
+                "questions found in the official question bank."
+            )
+
     if not topic_rules and domain_rules:
         domain_rule_total = sum(r.number_of_questions for r in domain_rules)
         if domain_rule_total != blueprint.total_questions:
@@ -222,10 +245,6 @@ def select_questions_for_blueprint(user, blueprint):
                 f"Blueprint total_questions is {blueprint.total_questions}, "
                 f"but domain rules add up to {domain_rule_total}."
             )
-
-        department = _user_department(user)
-        if not department:
-            raise ValueError("Student has no department assigned; cannot generate blueprint exam.")
 
         selected_ids = set()
         selected_questions = []
@@ -236,7 +255,8 @@ def select_questions_for_blueprint(user, blueprint):
             domain_qs = Question.objects.filter(
                 topic__domain=rule.domain,
                 topic__domain__course__department=department,
-                **DEFAULT_APPROVED_FILTER
+                **DEFAULT_APPROVED_FILTER,
+                **blueprint_question_filter,
             ).exclude(id__in=selected_ids)
 
             ranked = rank_questions_for_student(user, domain_qs)
@@ -264,7 +284,8 @@ def select_questions_for_blueprint(user, blueprint):
             course_qs = Question.objects.filter(
                 topic__domain__course=blueprint.course,
                 topic__domain__course__department=department,
-                **DEFAULT_APPROVED_FILTER
+                **DEFAULT_APPROVED_FILTER,
+                **blueprint_question_filter,
             ).exclude(id__in=selected_ids)
 
             fallback = list(
@@ -282,10 +303,6 @@ def select_questions_for_blueprint(user, blueprint):
         return selected_questions, allocation_report, warnings
 
     # Topic-rule blueprint path
-    department = _user_department(user)
-    if not department:
-        raise ValueError("Student has no department assigned; cannot generate blueprint exam.")
-
     topic_rule_total = sum(rule.question_count for rule in topic_rules)
 
     if topic_rule_total != blueprint.total_questions:
@@ -297,7 +314,8 @@ def select_questions_for_blueprint(user, blueprint):
     total_available = Question.objects.filter(
         topic__domain__course=blueprint.course,
         topic__domain__course__department=department,
-        **DEFAULT_APPROVED_FILTER
+        **DEFAULT_APPROVED_FILTER,
+        **blueprint_question_filter,
     ).count()
 
     if total_available < blueprint.total_questions:
@@ -316,7 +334,8 @@ def select_questions_for_blueprint(user, blueprint):
         topic_queryset = Question.objects.filter(
             topic=rule.topic,
             topic__domain__course__department=department,
-            **DEFAULT_APPROVED_FILTER
+            **DEFAULT_APPROVED_FILTER,
+            **blueprint_question_filter,
         ).exclude(id__in=selected_ids)
 
         ranked_questions = rank_questions_for_student(user, topic_queryset)
@@ -342,7 +361,8 @@ def select_questions_for_blueprint(user, blueprint):
             domain_queryset = Question.objects.filter(
                 topic__domain=topic.domain,
                 topic__domain__course__department=department,
-                **DEFAULT_APPROVED_FILTER
+                **DEFAULT_APPROVED_FILTER,
+                **blueprint_question_filter,
             ).exclude(id__in=selected_ids)
 
             domain_fallback = rank_questions_for_student(
@@ -359,7 +379,8 @@ def select_questions_for_blueprint(user, blueprint):
             course_queryset = Question.objects.filter(
                 topic__domain__course=blueprint.course,
                 topic__domain__course__department=department,
-                **DEFAULT_APPROVED_FILTER
+                **DEFAULT_APPROVED_FILTER,
+                **blueprint_question_filter,
             ).exclude(id__in=selected_ids)
 
             course_fallback = rank_questions_for_student(

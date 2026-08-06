@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
+import { ROLES, normalizeRole } from "../routes/roleRoutes";
 
 const AdminAcademic = () => {
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const isSystemAdmin = role === ROLES.SYSTEM_ADMIN || user?.is_staff;
+
   const [courses, setCourses] = useState([]);
+
   const [domains, setDomains] = useState([]);
   const [topics, setTopics] = useState([]);
 
@@ -179,43 +186,52 @@ const AdminAcademic = () => {
             <div className="card-body p-4">
               <h5 className="fw-bold mb-3">Exit Exams</h5>
 
-              <form onSubmit={createCourse}>
-                <div className="mb-3">
-                  <label className="form-label">Exit Exam Year</label>
-                  <input
-                    className="form-control"
-                    value={courseForm.name}
-                    onChange={(e) =>
-                      setCourseForm({
-                        ...courseForm,
-                        name: e.target.value,
-                      })
-                    }
-                    required
-                  />
+              {isSystemAdmin ? (
+                <>
+                  <form onSubmit={createCourse}>
+                    <div className="mb-3">
+                      <label className="form-label">Exit Exam Name</label>
+                      <input
+                        className="form-control"
+                        value={courseForm.name}
+                        onChange={(e) =>
+                          setCourseForm({
+                            ...courseForm,
+                            name: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Computer Science BSc Exit Exam"
+                        required
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="form-label">Description</label>
+                      <textarea
+                        className="form-control"
+                        rows="3"
+                        value={courseForm.description}
+                        onChange={(e) =>
+                          setCourseForm({
+                            ...courseForm,
+                            description: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <button className="btn btn-primary w-100">
+                      Add Exit Exam
+                    </button>
+                  </form>
+
+                  <hr />
+                </>
+              ) : (
+                <div className="alert alert-info small mb-3">
+                  <strong>Curriculum Courses</strong> are managed centrally by System Administrators. As Department Head, you can create and manage Domains and Topics under your department&apos;s existing courses below.
                 </div>
-
-                <div className="mb-3">
-                  <label className="form-label">Description</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={courseForm.description}
-                    onChange={(e) =>
-                      setCourseForm({
-                        ...courseForm,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <button className="btn btn-primary w-100">
-                  Add Exit Exam
-                </button>
-              </form>
-
-              <hr />
+              )}
 
               <div className="d-grid gap-2">
                 {courses.map((course) => (
@@ -230,12 +246,14 @@ const AdminAcademic = () => {
                       </p>
                     </div>
 
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => deleteCourse(course.id)}
-                    >
-                      Delete
-                    </button>
+                    {isSystemAdmin && (
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => deleteCourse(course.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

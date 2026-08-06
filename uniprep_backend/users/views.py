@@ -16,6 +16,15 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def registration_departments(request):
+    return Response(
+        list(Department.objects.order_by("name").values("id", "name")),
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(["GET", "PATCH"])
 @permission_classes([permissions.IsAuthenticated])
 def current_user(request):

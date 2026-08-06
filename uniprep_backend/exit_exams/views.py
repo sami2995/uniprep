@@ -1,4 +1,4 @@
-from .permissions import IsAdminRole, IsAdminOrReadOnly, IsDepartmentHeadOrSystemAdmin, IsSystemAdminOnly
+from .permissions import IsAdminRole, IsAdminOrReadOnly, IsDepartmentHeadOrSystemAdmin, IsSystemAdminOnly, IsSystemAdminOrReadOnly
 import random
 
 from django.db import transaction
@@ -124,6 +124,27 @@ def is_system_admin_user(user):
     return getattr(user, "role", None) == "system_admin"
 
 
+def verification_required_response(user):
+    return Response(
+        {
+            "error": (
+                "Your account is pending verification. You can use personal study "
+                "features, but exit exam content requires institutional verification."
+            ),
+            "verification_status": getattr(user, "verification", "pending"),
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def verified_student_required(request):
+    return (
+        is_student_user(request.user)
+        and getattr(request.user, "verification", "pending")
+        != "verified"
+    )
+
+
 def get_user_department(user):
     return getattr(user, "department", None)
 
@@ -160,15 +181,19 @@ def teacher_assigned_topic_ids(user):
             active=True,
         ).values_list("topic_id", flat=True)
     )
+    if topic_ids:
+        return list(topic_ids)
+
     legacy_course_ids = TeacherCourseAssignment.objects.filter(
         teacher=user
     ).values_list("course_id", flat=True)
     if legacy_course_ids:
-        legacy_topic_ids = Topic.objects.filter(
-            domain__course_id__in=list(legacy_course_ids)
-        ).values_list("id", flat=True)
-        topic_ids.update(legacy_topic_ids)
-    return list(topic_ids)
+        return list(
+            Topic.objects.filter(
+                domain__course_id__in=list(legacy_course_ids)
+            ).values_list("id", flat=True)
+        )
+    return []
 
 
 def teacher_assigned_course_ids(user):
@@ -427,7 +452,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsSystemAdminOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
@@ -820,10 +845,10 @@ class DomainViewSet(viewsets.ModelViewSet):
                 return queryset.filter(course__department=department)
             return queryset.none()
 
-        # Teachers see only domains from their assigned courses
+        # Teachers see only domains containing topics assigned to them
         if is_teacher_user(user):
-            assigned_course_ids = teacher_assigned_course_ids(user)
-            return queryset.filter(course_id__in=assigned_course_ids)
+            assigned_topic_ids = teacher_assigned_topic_ids(user)
+            return queryset.filter(topics__id__in=assigned_topic_ids).distinct()
 
         # Students see only domains from their department's courses
         if is_student_user(user):
@@ -934,6 +959,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(user).data)
         queryset = Question.objects.select_related(
             "created_by",
             "reviewed_by",
@@ -1340,6 +1367,8 @@ class ChoiceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(user).data)
         queryset = Choice.objects.select_related(
             "question",
             "question__created_by",
@@ -1422,12 +1451,17 @@ class MockExamViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(user).data)
+
         if is_admin_user(user):
             return MockExam.objects.all()
 
         return MockExam.objects.filter(student=user)
 
     def perform_create(self, serializer):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
         serializer.save(student=self.request.user)
 
 
@@ -1435,6 +1469,19 @@ class MockExamQuestionViewSet(viewsets.ModelViewSet):
     queryset = MockExamQuestion.objects.all()
     serializer_class = MockExamQuestionSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
+        user = self.request.user
+        if is_admin_user(user):
+            return MockExamQuestion.objects.all()
+        return MockExamQuestion.objects.filter(mock_exam__student=user)
+
+    def perform_create(self, serializer):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
+        serializer.save()
 
 
 class ExamAttemptViewSet(viewsets.ModelViewSet):
@@ -1444,12 +1491,17 @@ class ExamAttemptViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(user).data)
+
         if is_admin_user(user):
             return ExamAttempt.objects.all()
 
         return ExamAttempt.objects.filter(student=user)
 
     def perform_create(self, serializer):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
         serializer.save(student=self.request.user)
 
 
@@ -1457,6 +1509,19 @@ class AttemptDetailViewSet(viewsets.ModelViewSet):
     queryset = AttemptDetail.objects.all()
     serializer_class = AttemptDetailSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
+        user = self.request.user
+        if is_admin_user(user):
+            return AttemptDetail.objects.all()
+        return AttemptDetail.objects.filter(attempt__student=user)
+
+    def perform_create(self, serializer):
+        if verified_student_required(self.request):
+            raise PermissionDenied(verification_required_response(self.request.user).data)
+        serializer.save()
 
 
 # --------------------------------------------------
@@ -1548,6 +1613,9 @@ class ExamBlueprintDomainRuleViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def generate_mock_exam(request):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
 
     if not is_student_user(user):
         return Response(
@@ -1747,6 +1815,9 @@ def generate_mock_exam(request):
 def submit_mock_exam(request):
     user = request.user
 
+    if verified_student_required(request):
+        return verification_required_response(user)
+
     mock_exam_id = request.data.get("mock_exam_id")
     answers = request.data.get("answers", [])
     duration_seconds = int(request.data.get("duration_seconds", 0))
@@ -1890,6 +1961,9 @@ def submit_mock_exam(request):
 def my_exam_results(request):
     user = request.user
 
+    if verified_student_required(request):
+        return verification_required_response(user)
+
     if not is_student_user(user):
         return Response(
             {"detail": "Only students can view their results."},
@@ -1908,6 +1982,12 @@ def my_exam_results(request):
     for attempt in attempts:
         total_questions = attempt.details.count()
         correct_count = attempt.details.filter(is_correct=True).count()
+        official_count = attempt.details.filter(
+            question__source_type=Question.SourceType.IMPORTED
+        ).count()
+        instructor_count = attempt.details.filter(
+            question__source_type=Question.SourceType.MANUAL
+        ).count()
 
         results.append({
             "attempt_id": attempt.id,
@@ -1920,6 +2000,10 @@ def my_exam_results(request):
             "duration_seconds": attempt.duration_seconds,
             "status": attempt.status,
             "submitted_at": attempt.submitted_at,
+            "source_breakdown": {
+                "official": official_count,
+                "instructor": instructor_count,
+            },
         })
 
     return Response(
@@ -1932,6 +2016,9 @@ def my_exam_results(request):
 @permission_classes([IsAuthenticated])
 def exam_result_detail(request, attempt_id):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
 
     if not is_student_user(user):
         return Response(
@@ -1963,6 +2050,12 @@ def exam_result_detail(request, attempt_id):
     ).prefetch_related("question__choices")
 
     question_details = []
+    official_count = details.filter(
+        question__source_type=Question.SourceType.IMPORTED
+    ).count()
+    instructor_count = details.filter(
+        question__source_type=Question.SourceType.MANUAL
+    ).count()
 
     for detail in details:
         correct_choice = detail.question.choices.filter(
@@ -1992,6 +2085,10 @@ def exam_result_detail(request, attempt_id):
             "score": attempt.total_score,
             "duration_seconds": attempt.duration_seconds,
             "submitted_at": attempt.submitted_at,
+            "source_breakdown": {
+                "official": official_count,
+                "instructor": instructor_count,
+            },
             "questions": question_details
         },
         status=status.HTTP_200_OK
@@ -3390,6 +3487,9 @@ def question_search(request):
     """
     user = request.user
 
+    if verified_student_required(request):
+        return verification_required_response(user)
+
     # Base queryset scoped by role
     queryset = Question.objects.select_related(
         "created_by",
@@ -3802,6 +3902,10 @@ def system_settings(request):
         ]:
             if field in request.data:
                 setattr(settings_obj, field, int(request.data[field]))
+        if "restrict_blueprint_to_official_questions" in request.data:
+            settings_obj.restrict_blueprint_to_official_questions = bool(
+                request.data["restrict_blueprint_to_official_questions"]
+            )
         settings_obj.updated_by = request.user
         settings_obj.save()
 
@@ -3821,6 +3925,7 @@ def system_settings(request):
         "mastery_threshold_accuracy": settings_obj.mastery_threshold_accuracy,
         "mastery_minimum_attempts": settings_obj.mastery_minimum_attempts,
         "quiz_unlock_score": settings_obj.quiz_unlock_score,
+        "restrict_blueprint_to_official_questions": settings_obj.restrict_blueprint_to_official_questions,
         "updated_at": settings_obj.updated_at,
     })
 
@@ -3887,10 +3992,114 @@ def list_users(request):
             "department": u.department.name if u.department else None,
             "department_id": u.department_id,
             "is_active": u.is_active,
+            "verification": u.verification,
             "date_joined": u.date_joined,
             "first_name": u.first_name,
             "last_name": u.last_name,
         } for u in users_slice]
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsSystemAdminOnly])
+def pending_verification_users(request):
+    User = get_user_model()
+    queryset = User.objects.filter(
+        role="student",
+        verification=User.VerificationStatus.PENDING,
+    ).select_related("department").order_by("date_joined")
+
+    return Response([
+        {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "department": user.department.name if user.department else None,
+            "department_id": user.department_id,
+            "date_joined": user.date_joined,
+            "verification": user.verification,
+        }
+        for user in queryset
+    ])
+
+
+@api_view(["POST"])
+@permission_classes([IsSystemAdminOnly])
+def verify_user(request, user_id):
+    User = get_user_model()
+    try:
+        target = User.objects.select_related("department").get(
+            id=user_id,
+            role="student",
+        )
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Student not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    action = request.data.get("action")
+    if action not in {"verify", "reject"}:
+        return Response(
+            {"error": "action must be either 'verify' or 'reject'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if action == "verify" and not target.department:
+        return Response(
+            {
+                "error": (
+                    "Cannot verify this student — no department is set on their "
+                    "account. Please contact the student to update their profile, "
+                    "or reject this registration."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    target.verification = (
+        User.VerificationStatus.VERIFIED
+        if action == "verify"
+        else User.VerificationStatus.REJECTED
+    )
+    target.verified_by = request.user
+    target.verified_at = timezone.now()
+    target.rejection_reason = (
+        str(request.data.get("reason", "")).strip()
+        if action == "reject"
+        else ""
+    )
+    target.save(update_fields=[
+        "verification",
+        "verified_by",
+        "verified_at",
+        "rejection_reason",
+    ])
+
+    AuditLog.objects.create(
+        user=request.user,
+        action=AuditLog.Action.UPDATED,
+        entity_type="user",
+        entity_id=target.id,
+        new_value={
+            "verification": target.verification,
+            "verified_by": request.user.id,
+            "rejection_reason": target.rejection_reason,
+        },
+        description=(
+            f"System admin {request.user.username} "
+            f"{'verified' if action == 'verify' else 'rejected'} student "
+            f"{target.username}."
+        ),
+    )
+
+    return Response({
+        "id": target.id,
+        "username": target.username,
+        "verification": target.verification,
+        "verified_by": request.user.id,
+        "verified_at": target.verified_at,
+        "rejection_reason": target.rejection_reason,
     })
 
 

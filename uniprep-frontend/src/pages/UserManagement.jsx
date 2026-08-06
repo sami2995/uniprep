@@ -27,6 +27,8 @@ const ROLE_LABELS = {
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -82,9 +84,25 @@ const UserManagement = () => {
     }
   }, [page, search, roleFilter, statusFilter]);
 
+  const fetchPendingUsers = useCallback(async () => {
+    setPendingLoading(true);
+    try {
+      const response = await api.get("/admin/users/pending-verification/");
+      setPendingUsers(response.data || []);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to load pending verification queue.");
+    } finally {
+      setPendingLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    fetchPendingUsers();
+  }, [fetchPendingUsers]);
 
   useEffect(() => {
     const loadDepartments = async () => {
@@ -193,6 +211,19 @@ const UserManagement = () => {
     }
   };
 
+  const handleVerification = async (targetUser, action) => {
+    const reason = action === "reject"
+      ? window.prompt("Optional rejection reason:", "") || ""
+      : "";
+    try {
+      await api.post(`/admin/users/${targetUser.id}/verify/`, { action, reason });
+      setSuccess(`${targetUser.username} has been ${action === "verify" ? "verified" : "rejected"}.`);
+      await Promise.all([fetchPendingUsers(), fetchUsers()]);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to update verification status.");
+    }
+  };
+
   const openResetModal = (user) => {
     setResetModalUser(user);
     setNewPassword("");
@@ -252,6 +283,46 @@ const UserManagement = () => {
           <div>{success}</div>
         </div>
       )}
+
+      <div className="card border-0 shadow-sm rounded-4 mb-4">
+        <div className="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2">
+            <UserCheck size={20} className="text-primary" />
+            Pending Verification ({pendingUsers.length})
+          </h5>
+          <p className="text-muted small mb-0">Confirm student enrollment before granting access to institution exam content.</p>
+        </div>
+        <div className="card-body p-4">
+          {pendingLoading ? (
+            <div className="text-muted">Loading verification queue...</div>
+          ) : pendingUsers.length === 0 ? (
+            <div className="text-muted">No students are waiting for verification.</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr><th>Student</th><th>Department</th><th>Registered</th><th className="text-end">Decision</th></tr>
+                </thead>
+                <tbody>
+                  {pendingUsers.map((student) => (
+                    <tr key={student.id}>
+                      <td><div className="fw-semibold">{student.username}</div><div className="small text-muted">{student.email}</div></td>
+                      <td>{student.department || "—"}</td>
+                      <td className="small text-muted">{student.date_joined ? new Date(student.date_joined).toLocaleDateString() : "—"}</td>
+                      <td className="text-end">
+                        <div className="btn-group">
+                          <button className="btn btn-sm btn-outline-success" onClick={() => handleVerification(student, "verify")}>Verify</button>
+                          <button className="btn btn-sm btn-outline-danger" onClick={() => handleVerification(student, "reject")}>Reject</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Create User Form */}
       <div className="card border-0 shadow-sm rounded-4 mb-4">

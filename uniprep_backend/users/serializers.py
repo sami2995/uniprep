@@ -7,7 +7,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True, min_length=6)
 
     student_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    department = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    department = serializers.CharField(write_only=True, required=True)
     program = serializers.CharField(write_only=True, required=False, allow_blank=True)
     year_of_study = serializers.IntegerField(write_only=True, required=False)
 
@@ -70,7 +70,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         StudentProfile.objects.create(
             user=user,
             student_id=student_id,
-            department=department_name,
+            department=department.name if department else "",
             program=program,
             year_of_study=year_of_study
         )
@@ -95,8 +95,14 @@ class UserSerializer(serializers.ModelSerializer):
             "department",
             "department_name",
             "student_profile",
+            "verification",
+            "verified_at",
+            "rejection_reason",
         ]
-        read_only_fields = ["id", "role", "department", "department_name"]
+        read_only_fields = [
+            "id", "role", "department", "department_name", "verification",
+            "verified_at", "rejection_reason",
+        ]
 
     def get_student_profile(self, obj):
         if hasattr(obj, "student_profile"):
@@ -140,9 +146,13 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = [
             "id", "username", "email", "password", "role",
             "department", "department_name", "is_active",
-            "date_joined", "first_name", "last_name",
+            "date_joined", "first_name", "last_name", "verification",
+            "verified_by", "verified_at", "rejection_reason",
         ]
-        read_only_fields = ["id", "date_joined", "department_name"]
+        read_only_fields = [
+            "id", "date_joined", "department_name", "verification",
+            "verified_by", "verified_at", "rejection_reason",
+        ]
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

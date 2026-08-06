@@ -34,6 +34,23 @@ def is_student(user):
     return getattr(user, "role", None) == "student"
 
 
+def verification_required_response(user):
+    return Response(
+        {
+            "error": (
+                "Your account is pending verification. You can use personal study "
+                "features, but exit exam content requires institutional verification."
+            ),
+            "verification_status": getattr(user, "verification", "pending"),
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def verified_student_required(request):
+    return is_student(request.user) and request.user.verification != "verified"
+
+
 def generate_unique_challenge_code():
     code = generate_challenge_code()
 
@@ -60,6 +77,9 @@ def is_participant(challenge, user):
 @permission_classes([IsAuthenticated])
 def create_challenge(request):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
 
     if not is_student(user):
         return Response(
@@ -153,6 +173,9 @@ def create_challenge(request):
 def join_challenge(request):
     user = request.user
 
+    if verified_student_required(request):
+        return verification_required_response(user)
+
     if not is_student(user):
         return Response(
             {"detail": "Only students can join challenge rooms."},
@@ -210,6 +233,9 @@ def join_challenge(request):
 @permission_classes([IsAuthenticated])
 def challenge_detail(request, room_code):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
     challenge = get_challenge_or_none(room_code)
 
     if not challenge:
@@ -244,6 +270,9 @@ def challenge_detail(request, room_code):
 @permission_classes([IsAuthenticated])
 def start_challenge(request, room_code):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
     challenge = get_challenge_or_none(room_code)
 
     if not challenge:
@@ -281,6 +310,9 @@ def start_challenge(request, room_code):
 @permission_classes([IsAuthenticated])
 def challenge_questions(request, room_code):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
     challenge = get_challenge_or_none(room_code)
 
     if not challenge:
@@ -318,6 +350,9 @@ def challenge_questions(request, room_code):
 @permission_classes([IsAuthenticated])
 def submit_challenge(request, room_code):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
     challenge = get_challenge_or_none(room_code)
 
     if not challenge:
@@ -415,6 +450,9 @@ def submit_challenge(request, room_code):
 @permission_classes([IsAuthenticated])
 def challenge_leaderboard(request, room_code):
     user = request.user
+
+    if verified_student_required(request):
+        return verification_required_response(user)
     challenge = get_challenge_or_none(room_code)
 
     if not challenge:

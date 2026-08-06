@@ -27,6 +27,7 @@ from exit_exams.views import (
     is_department_head_user,
     get_user_department,
     department_head_can_manage_course,
+    verified_student_required,
 )
 
 
@@ -424,6 +425,8 @@ class SpacedRepetitionQueueViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if verified_student_required(self.request):
+            return SpacedRepetitionQueue.objects.none()
         base_qs = SpacedRepetitionQueue.objects.select_related("question")
         if user.is_staff or user.role in ADMIN_ROLES:
             return base_qs.all()
@@ -680,6 +683,18 @@ def student_trend(request):
 @permission_classes([IsAuthenticated])
 def student_recommendations(request):
     user = request.user
+
+    if verified_student_required(request):
+        return Response(
+            {
+                "error": (
+                    "Your account is pending verification. You can use personal study "
+                    "features, but exit exam content requires institutional verification."
+                ),
+                "verification_status": getattr(user, "verification", "pending"),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     if getattr(user, "role", None) not in STUDENT_ROLES:
         return Response(
@@ -952,13 +967,15 @@ def student_dashboard(request):
             weak_domains_data.append(d_data)
 
     # Spaced repetition due today or earlier (approved active questions only)
-    due_reviews = SpacedRepetitionQueue.objects.filter(
-        student=user,
-        is_active=True,
-        next_review_date__lte=timezone.now().date(),
-        question__status=Question.Status.APPROVED,
-        question__is_active=True
-    ).select_related("question", "topic")
+    due_reviews = SpacedRepetitionQueue.objects.none()
+    if not verified_student_required(request):
+        due_reviews = SpacedRepetitionQueue.objects.filter(
+            student=user,
+            is_active=True,
+            next_review_date__lte=timezone.now().date(),
+            question__status=Question.Status.APPROVED,
+            question__is_active=True
+        ).select_related("question", "topic")
 
     # Focus / productivity summary
     today = timezone.now().date()

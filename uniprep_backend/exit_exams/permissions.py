@@ -82,3 +82,20 @@ class IsAdminOrReadOnly(BasePermission):
             return True
 
         return request.user.is_staff or getattr(request.user, "role", None) in ADMIN_ROLES
+
+
+class IsSystemAdminOrReadOnly(BasePermission):
+    """
+    Only system_admin (or Django is_staff) can create/update/delete.
+    All authenticated users can read.
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.method in SAFE_METHODS:
+            return True
+
+        return request.user.is_staff or getattr(request.user, "role", None) == "system_admin"
+

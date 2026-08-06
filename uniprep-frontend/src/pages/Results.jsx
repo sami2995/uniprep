@@ -38,6 +38,7 @@ const Results = () => {
                     <th>Course</th>
                     <th>Score</th>
                     <th>Correct</th>
+                    <th>Source</th>
                     <th>Date</th>
                     <th></th>
                   </tr>
@@ -55,6 +56,16 @@ const Results = () => {
                       </td>
                       <td>
                         {result.correct_count}/{result.total_questions}
+                      </td>
+                      <td>
+                        {result.source_breakdown?.official === result.total_questions ? (
+                          `${result.source_breakdown.official} Official MOE Questions`
+                        ) : (
+                          <>
+                            <div>✓ Official MOE: {result.source_breakdown?.official || 0}</div>
+                            <div>✓ Instructor-authored: {result.source_breakdown?.instructor || 0}</div>
+                          </>
+                        )}
                       </td>
                       <td>
                         {new Date(result.submitted_at).toLocaleString()}

@@ -58,7 +58,10 @@ const SidebarLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const role = normalizeRole(user?.role);
-  const links = SIDEBAR_LINKS[role] || [];
+  const links = (SIDEBAR_LINKS[role] || []).filter((link) => {
+    if (role !== "student" || user?.verification === "verified") return true;
+    return !["/student/exams", "/student/battle"].includes(link.path);
+  });
 
   const handleLogout = () => {
     logout();

@@ -10,6 +10,7 @@ const SystemSettingsPage = () => {
     mastery_threshold_accuracy: 80,
     mastery_minimum_attempts: 3,
     quiz_unlock_score: 70,
+    restrict_blueprint_to_official_questions: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +34,8 @@ const SystemSettingsPage = () => {
         mastery_threshold_accuracy: response.data.mastery_threshold_accuracy ?? 80,
         mastery_minimum_attempts: response.data.mastery_minimum_attempts ?? 3,
         quiz_unlock_score: response.data.quiz_unlock_score ?? 70,
+        restrict_blueprint_to_official_questions:
+          response.data.restrict_blueprint_to_official_questions ?? true,
       });
       setUpdatedAt(response.data.updated_at);
     } catch (err) {
@@ -56,6 +59,8 @@ const SystemSettingsPage = () => {
         mastery_threshold_accuracy: Number(settings.mastery_threshold_accuracy),
         mastery_minimum_attempts: Number(settings.mastery_minimum_attempts),
         quiz_unlock_score: Number(settings.quiz_unlock_score),
+        restrict_blueprint_to_official_questions:
+          Boolean(settings.restrict_blueprint_to_official_questions),
       });
 
       setSettings({
@@ -65,6 +70,8 @@ const SystemSettingsPage = () => {
         mastery_threshold_accuracy: response.data.mastery_threshold_accuracy ?? 80,
         mastery_minimum_attempts: response.data.mastery_minimum_attempts ?? 3,
         quiz_unlock_score: response.data.quiz_unlock_score ?? 70,
+        restrict_blueprint_to_official_questions:
+          response.data.restrict_blueprint_to_official_questions ?? true,
       });
       setUpdatedAt(response.data.updated_at);
       setSuccess("System settings updated successfully.");
@@ -244,6 +251,27 @@ const SystemSettingsPage = () => {
                     />
                     <small className="form-text text-muted">
                       Score needed on the Quiz step of a learning path to unlock the Mini Mock step.
+                    </small>
+                  </div>
+
+                  <div className="form-check form-switch mb-4">
+                    <input
+                      id="restrict-blueprint-official"
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={Boolean(settings.restrict_blueprint_to_official_questions)}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          restrict_blueprint_to_official_questions: e.target.checked,
+                        })
+                      }
+                    />
+                    <label className="form-check-label fw-medium" htmlFor="restrict-blueprint-official">
+                      Blueprint exams use official questions only
+                    </label>
+                    <small className="form-text text-muted d-block">
+                      Restrict Blueprint Mock generation to imported official exam questions.
                     </small>
                   </div>
 

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GraduationCap } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
+import api from "../api/api";
 
 const Register = () => {
   const { register } = useAuth();
@@ -11,7 +12,7 @@ const Register = () => {
     username: "",
     email: "",
     student_id: "",
-    department: "Computer Science",
+    department: "",
     program: "Computer Science",
     year_of_study: 4,
     password: "",
@@ -20,6 +21,23 @@ const Register = () => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const response = await api.get("/users/registration-departments/");
+        setDepartments(response.data || []);
+      } catch {
+        setError("Unable to load departments. Please try again.");
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+  }, []);
 
   const handleChange = (e) => {
     setForm({
@@ -43,7 +61,12 @@ const Register = () => {
       await register(form);
       navigate("/login");
     } catch (err) {
-      setError("Registration failed. Check your inputs.");
+      const data = err.response?.data;
+      const messages = Object.entries(data || {}).flatMap(([field, value]) => {
+        const label = field === "detail" ? "" : `${field}: `;
+        return [`${label}${Array.isArray(value) ? value.join(" ") : value}`];
+      });
+      setError(messages.length ? messages.join(" ") : "Registration failed. Check your inputs.");
     } finally {
       setLoading(false);
     }
@@ -122,12 +145,23 @@ const Register = () => {
 
                   <div className="mb-3">
                     <label className="form-label">Department</label>
-                    <input
+                    <select
                       name="department"
                       className="form-control"
                       value={form.department}
                       onChange={handleChange}
-                    />
+                      required
+                      disabled={departmentsLoading}
+                    >
+                      <option value="">
+                        {departmentsLoading ? "Loading departments..." : "Select your department"}
+                      </option>
+                      {departments.map((department) => (
+                        <option key={department.id} value={department.name}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="mb-3">

@@ -64,9 +64,13 @@ def infer_answer_letter(answer_text, options):
     """
 
     answer_text = clean_text(answer_text).lower()
+    if not answer_text:
+        return ""
 
     for letter, option_text in options.items():
         option_text_clean = clean_text(option_text).lower()
+        if not option_text_clean:
+            continue
 
         if answer_text == option_text_clean:
             return letter
@@ -80,118 +84,219 @@ def infer_answer_letter(answer_text, options):
     return ""
 
 
+def extract_global_answer_key(text):
+    """
+    Extract answer keys and explanations from document-level tables or sections
+    (e.g., Answer Key tables or '1. Answer B: explanation' sections at the end).
+    """
+    key = {}
+    explanations = {}
+
+    # 1. Answer key table format: '1 B' or '1. B'
+    for num, ans in re.findall(r"^\s*(\d{1,3})\.?\s+([A-Da-d])\s*$", text, re.MULTILINE):
+        key[int(num)] = ans.upper()
+
+    # 2. Explanations section format: '1. Answer B: explanation text...'
+    for num, ans, exp in re.findall(r"^\s*(\d{1,3})\.\s*Answer\s*([A-Da-d])\s*:\s*(.*)", text, re.MULTILINE):
+        key[int(num)] = ans.upper()
+        explanations[int(num)] = clean_text(exp)
+
+    return key, explanations
+
+
+# ---------------------------------------------------------------------------
+# Linear Boundary-based Question Parser (Zero Backtracking / O(n) Execution)
+# ---------------------------------------------------------------------------
+
+_RAW_BOUNDARY = re.compile(
+    r"^\s*(\d{1,3})\.?[\s\xa0]+",
+    re.MULTILINE
+)
+
+# Robust Answer Token pattern matching all Ethiopian Exit Exam formats:
+# - ANSWER: A / Answer: B / Ans: C / ANS: D
+# - Ans. A / Ans. a. / Ans A
+# - The correct answer is X
+# - Correct answer: X
+_ANS_TOKEN = re.compile(
+    r"[\s\xa0]+(?i:Answer\s*:?|Ans\s*\.?|The\s+correct\s+answer\s+is|Correct\s+answer\s*:?)\s*"
+)
+
+
+def _parse_single_block(block_text, number, global_key, global_exp):
+    """
+    Linearly extract MCQ options and answer from a single bounded block_text.
+    Supports inline answers ('Ans. B', 'ANSWER: A'), standalone option blocks without inline answer
+    tokens (extracting answers from document-level answer key/explanations), and doubled/single option letters.
+    """
+    # 1. Try Moodle format: doubled option letters ("A. a.")
+    moodle_a = re.search(r"\s+A\.\s*a\.\s*", block_text)
+    if moodle_a:
+        q_text = block_text[:moodle_a.start()]
+        rest = block_text[moodle_a.end():]
+        b_m = re.search(r"\s+B\.\s*b\.\s*", rest)
+        if b_m:
+            opt_a = rest[:b_m.start()]
+            rest = rest[b_m.end():]
+            c_m = re.search(r"\s+C\.\s*c\.\s*", rest)
+            if c_m:
+                opt_b = rest[:c_m.start()]
+                rest = rest[c_m.end():]
+                d_m = re.search(r"\s+D\.\s*d\.\s*", rest)
+                if d_m:
+                    opt_c = rest[:d_m.start()]
+                    rest = rest[d_m.end():]
+                    ans_m = _ANS_TOKEN.search(rest)
+                    if ans_m:
+                        opt_d = rest[:ans_m.start()]
+                        ans_rest = rest[ans_m.end():].lstrip()
+                        ans_match = re.match(
+                            r"^(?:([a-dA-D])[\s\.\:]*)?(.*)",
+                            ans_rest,
+                            re.DOTALL
+                        )
+                        ans_letter = (ans_match.group(1) or "").upper() if ans_match else ""
+                        ans_text = (
+                            clean_text(ans_match.group(2))
+                            if ans_match
+                            else clean_text(ans_rest)
+                        )
+                    else:
+                        opt_d = rest
+                        ans_letter = global_key.get(number, "")
+                        ans_text = global_exp.get(number, "")
+
+                    opts = {
+                        "A": clean_text(opt_a),
+                        "B": clean_text(opt_b),
+                        "C": clean_text(opt_c),
+                        "D": clean_text(opt_d),
+                    }
+                    if all(opts.values()):
+                        if not ans_letter:
+                            ans_letter = infer_answer_letter(ans_text, opts)
+                        return {
+                            "question_number": number,
+                            "question_text": clean_text(q_text),
+                            "option_a": opts["A"],
+                            "option_b": opts["B"],
+                            "option_c": opts["C"],
+                            "option_d": opts["D"],
+                            "correct_answer": ans_letter,
+                            "explanation": ans_text,
+                        }
+
+    # 2. Try Ministry format: single-letter options ("A. ")
+    min_a = re.search(r"[\s\xa0]+A\.\s+", block_text)
+    if min_a:
+        q_text = block_text[:min_a.start()]
+        rest = block_text[min_a.end():]
+        min_b = re.search(r"[\s\xa0]+B\.\s+", rest)
+        if min_b:
+            opt_a = rest[:min_b.start()]
+            rest = rest[min_b.end():]
+            min_c = re.search(r"[\s\xa0]+C\.\s+", rest)
+            if min_c:
+                opt_b = rest[:min_c.start()]
+                rest = rest[min_c.end():]
+                min_d = re.search(r"[\s\xa0]+D\.\s+", rest)
+                if min_d:
+                    opt_c = rest[:min_d.start()]
+                    rest = rest[min_d.end():]
+                    ans_m = _ANS_TOKEN.search(rest)
+                    if ans_m:
+                        opt_d = rest[:ans_m.start()]
+                        ans_rest = rest[ans_m.end():].lstrip()
+                        ans_match = re.match(
+                            r"^(?:([a-dA-D])[\s\.\:]*)?(.*)",
+                            ans_rest,
+                            re.DOTALL
+                        )
+                        ans_letter = (ans_match.group(1) or "").upper() if ans_match else ""
+                        ans_text = (
+                            clean_text(ans_match.group(2))
+                            if ans_match
+                            else clean_text(ans_rest)
+                        )
+                    else:
+                        opt_d = rest
+                        ans_letter = global_key.get(number, "")
+                        ans_text = global_exp.get(number, "")
+
+                    opts = {
+                        "A": clean_text(opt_a),
+                        "B": clean_text(opt_b),
+                        "C": clean_text(opt_c),
+                        "D": clean_text(opt_d),
+                    }
+                    if all(opts.values()):
+                        if not ans_letter:
+                            ans_letter = infer_answer_letter(ans_text, opts)
+                        return {
+                            "question_number": number,
+                            "question_text": clean_text(q_text),
+                            "option_a": opts["A"],
+                            "option_b": opts["B"],
+                            "option_c": opts["C"],
+                            "option_d": opts["D"],
+                            "correct_answer": ans_letter,
+                            "explanation": ans_text,
+                        }
+
+    return None
+
+
 def parse_mcq_questions(text):
     """
-    Robust parser for Ethiopian Exit Exam PDF styles like:
+    Robust linear parser for Ethiopian Exit Exam PDF styles.
 
-    1 Question text
-    A. a.
-    Option A text
-    B. b.
-    Option B text
-    C. c.
-    Option C text
-    D. d.
-    Option D text
-    Ans. a. Correct answer text
-
-    Supports:
-    - question numbers without dot
-    - A. a. / B. b. format
-    - page breaks inside questions
-    - Ans. a. and Ans . answer text
+    Uses a two-step boundary-based approach:
+    1. Extract document-level answer key tables / explanations if present.
+    2. Find all potential question-number boundaries via simple O(n) regex.
+    3. Filter out false boundaries (e.g., numbers inside answer explanations).
+    4. Slice text into per-question blocks and parse each linearly.
     """
 
     text = normalize_text(text)
+    global_key, global_exp = extract_global_answer_key(text)
 
-    # Format A (Moodle export): doubled option letters ("A. a.\n<text>"),
-    # "Ans." answer token. Kept exactly as before; only the question-number
-    # and final lookahead got the optional-dot / explicit \xa0 tweak (both
-    # are supersets, so bare-digit Moodle files still match identically).
-    moodle_pattern = re.compile(
-        r"""
-        (?m)^\s*(?P<number>\d{1,3})\.?[\s\xa0]+
-        (?P<question>.*?)
-        \s+A\.\s*a\.\s*(?P<a>.*?)
-        \s+B\.\s*b\.\s*(?P<b>.*?)
-        \s+C\.\s*c\.\s*(?P<c>.*?)
-        \s+D\.\s*d\.\s*(?P<d>.*?)
-        \s+(?:Ans\s*\.|ans\s*\.)\s*
-        (?:(?P<answer>[a-dA-D])\.?\s*)?
-        (?P<answer_text>.*?)
-        (?=^\s*\d{1,3}\.?[\s\xa0]+|\bQuestion number\s+100\b|\Z)
-        """,
-        re.DOTALL | re.VERBOSE,
-    )
+    raw_boundaries = list(_RAW_BOUNDARY.finditer(text))
 
-# Format B (Ministry-style real exam): inline single-letter options
-    # ("A. <text>"), "The correct answer is X." answer token. Mirrors the
-    # Moodle pattern but with the doubled-letter step dropped and an extra
-    # answer-token alternative added. Answer letter is inferred via the
-    # existing infer_answer_letter() when only answer text is captured.
-    # The question-text token is *tempered* so it cannot cross a following
-    # question-number line. This prevents numbered sub-lists inside an
-    # explanation (e.g. "1. Set of states ... 2. ... 5. ...") from being
-    # mistaken for a new question starter, which would otherwise create a
-    # phantom match that swallows a later real question's option block.
-    ministry_boundary = r"(?!^\s*\d{1,3}\.?[\s\xa0]+)"
-    ministry_pattern = re.compile(
-        r"""
-        (?m)^\s*(?P<number>\d{1,3})\.?[\s\xa0]+
-        (?P<question>(?:""" + ministry_boundary + r""".)*?)
-        [\s\xa0]+A\.\s+(?P<a>.*?)
-        [\s\xa0]+B\.\s+(?P<b>.*?)
-        [\s\xa0]+C\.\s+(?P<c>.*?)
-        [\s\xa0]+D\.\s+(?P<d>.*?)
-        [\s\xa0]+(?i:Ans\s*\.|The\s+correct\s+answer\s+is|Correct\s+answer\s*:?)\s*
-        (?:(?P<answer>[a-dA-D])\.?\s*)?
-        (?P<answer_text>.*?)
-        (?=^\s*\d{1,3}\.?[\s\xa0]+|\bQuestion number\s+100\b|\Z)
-        """,
-        re.DOTALL | re.VERBOSE,
-    )
+    if not raw_boundaries:
+        return []
 
-    def _collect(pattern, found, questions):
-        for match in pattern.finditer(text):
-            number = int(match.group("number"))
-
-            if number in found:
-                continue
-
-            options = {
-                "A": clean_text(match.group("a")),
-                "B": clean_text(match.group("b")),
-                "C": clean_text(match.group("c")),
-                "D": clean_text(match.group("d")),
-            }
-
-            answer = match.group("answer")
-            answer_text = clean_text(match.group("answer_text"))
-
-            if answer:
-                correct_answer = answer.upper()
-            else:
-                correct_answer = infer_answer_letter(answer_text, options)
-
-            questions.append({
-                "question_number": number,
-                "question_text": clean_text(match.group("question")),
-                "option_a": options["A"],
-                "option_b": options["B"],
-                "option_c": options["C"],
-                "option_d": options["D"],
-                "correct_answer": correct_answer,
-                "explanation": answer_text,
-            })
-            found.add(number)
+    # Filter boundaries: a valid question boundary MUST contain option A before the next boundary
+    boundaries = []
+    for i, b in enumerate(raw_boundaries):
+        next_pos = (
+            raw_boundaries[i + 1].start()
+            if i + 1 < len(raw_boundaries)
+            else len(text)
+        )
+        snippet = text[b.end():next_pos]
+        if re.search(r"\s+A\.\s*a\.\s*", snippet) or re.search(r"[\s\xa0]+A\.\s+", snippet):
+            boundaries.append(b)
 
     questions = []
     found = set()
 
-    # Moodle format tried first and takes precedence; Ministry format fills
-    # in any question numbers Moodle missed (tried in order, as required).
-    _collect(moodle_pattern, found, questions)
-    _collect(ministry_pattern, found, questions)
+    for i, b in enumerate(boundaries):
+        number = int(b.group(1))
+        if number in found:
+            continue
+
+        b_start = b.end()
+        b_end = (
+            boundaries[i + 1].start()
+            if i + 1 < len(boundaries)
+            else len(text)
+        )
+        block = text[b_start:b_end]
+
+        res = _parse_single_block(block, number, global_key, global_exp)
+        if res:
+            questions.append(res)
+            found.add(number)
 
     questions.sort(key=lambda q: q["question_number"])
 

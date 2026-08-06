@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from exit_exams.models import Department, AuditLog
+from exit_exams.models import Department, AuditLog, Course, Domain, Topic, Question, Choice
 
 User = get_user_model()
 
@@ -302,3 +302,112 @@ class AdminCreateUserTests(TestCase):
                 entity_id=user_id,
             ).exists()
         )
+
+
+class StudentVerificationAccessTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.department = Department.objects.create(name="Verification Department", code="VRFY")
+        course = Course.objects.create(name="Verification Course", department=self.department)
+        domain = Domain.objects.create(name="Verification Domain", course=course)
+        topic = Topic.objects.create(name="Verification Topic", domain=domain)
+        question = Question.objects.create(
+            topic=topic,
+            text="Institution question",
+            status=Question.Status.APPROVED,
+            is_active=True,
+        )
+        for index, text in enumerate(["A", "B", "C", "D"]):
+            Choice.objects.create(question=question, text=text, is_correct=index == 0)
+        self.course = course
+        self.admin = User.objects.create_user(
+            username="verification_admin",
+            email="verification_admin@example.com",
+            password="adminpass123",
+            role="system_admin",
+            verification="verified",
+        )
+
+    def test_registration_is_pending_and_exam_content_is_blocked(self):
+        registration = self.client.post(
+            "/api/users/register/",
+            {
+                "username": "pending_student",
+                "email": "pending_student@example.com",
+                "password": "studentpass123",
+                "password2": "studentpass123",
+                "department": self.department.name,
+            },
+            format="json",
+        )
+        self.assertEqual(registration.status_code, status.HTTP_201_CREATED)
+        student = User.objects.get(username="pending_student")
+        self.assertEqual(student.verification, "pending")
+
+        self.client.force_authenticate(user=student)
+        questions = self.client.get("/api/exit-exams/questions/")
+        mock = self.client.post(
+            "/api/exit-exams/generate-mock-exam/",
+            {"course_id": self.course.id, "total_questions": 1},
+            format="json",
+        )
+        self.assertEqual(questions.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(mock.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(questions.data["verification_status"], "pending")
+
+    def test_registration_requires_department(self):
+        response = self.client.post(
+            "/api/users/register/",
+            {
+                "username": "missing_department",
+                "email": "missing_department@example.com",
+                "password": "studentpass123",
+                "password2": "studentpass123",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("department", response.data)
+        self.assertFalse(User.objects.filter(username="missing_department").exists())
+
+    def test_verification_rejects_student_without_department(self):
+        student = User.objects.create_user(
+            username="null_department_student",
+            email="null_department@example.com",
+            password="studentpass123",
+            role="student",
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            f"/api/admin/users/{student.id}/verify/",
+            {"action": "verify"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("no department", response.data["error"])
+        student.refresh_from_db()
+        self.assertEqual(student.verification, "pending")
+
+
+    def test_system_admin_can_verify_student(self):
+        student = User.objects.create_user(
+            username="queue_student",
+            email="queue_student@example.com",
+            password="studentpass123",
+            role="student",
+            department=self.department,
+        )
+        self.client.force_authenticate(user=self.admin)
+        queue = self.client.get("/api/admin/users/pending-verification/")
+        self.assertEqual(queue.status_code, status.HTTP_200_OK)
+        self.assertIn(student.id, {item["id"] for item in queue.data})
+
+        response = self.client.post(
+            f"/api/admin/users/{student.id}/verify/",
+            {"action": "verify"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        student.refresh_from_db()
+        self.assertEqual(student.verification, "verified")
+        self.assertEqual(student.verified_by_id, self.admin.id)

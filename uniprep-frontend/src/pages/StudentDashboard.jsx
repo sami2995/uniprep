@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
 
 import {
   getDailyGoalMinutes,
@@ -104,6 +105,7 @@ const getMaterialStatusBadge = (status) => {
 };
 
 const StudentDashboard = () => {
+  const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [focusSummary, setFocusSummary] = useState(null);
   const [weakTopics, setWeakTopics] = useState([]);
@@ -263,6 +265,15 @@ const StudentDashboard = () => {
 
   return (
     <div className="container-fluid py-4">
+      {user?.verification !== "verified" && (
+        <div className="alert alert-warning border-0 shadow-sm rounded-4 mb-4">
+          <strong>Your account is pending verification.</strong> Exit exam features
+          will unlock once an administrator confirms your enrollment.
+          {user?.verification === "rejected" && user?.rejection_reason && (
+            <div className="small mt-1">Reason: {user.rejection_reason}</div>
+          )}
+        </div>
+      )}
       <div className="dashboard-hero mb-4">
         <div>
           <span className="dashboard-badge">Student Portal</span>
@@ -276,9 +287,11 @@ const StudentDashboard = () => {
         </div>
 
         <div className="d-flex gap-2 flex-wrap">
-          <Link className="btn btn-primary" to="/student/exams">
-            Start Exam
-          </Link>
+          {user?.verification === "verified" && (
+            <Link className="btn btn-primary" to="/student/exams">
+              Start Exam
+            </Link>
+          )}
 
           <Link className="btn btn-outline-primary" to="/student/materials">
             Study Materials
@@ -287,9 +300,11 @@ const StudentDashboard = () => {
           <Link className="btn btn-outline-dark" to="/student/focus">
             Focus Timer
           </Link>
-          <Link className="btn btn-outline-success" to="/student/battle">
-  Battle Mode
-</Link>
+              {user?.verification === "verified" && (
+                <Link className="btn btn-outline-success" to="/student/battle">
+                  Battle Mode
+                </Link>
+              )}
         </div>
       </div>
 
@@ -319,27 +334,31 @@ const StudentDashboard = () => {
           special
         />
       </div>
-        <div className="row g-3 mt-3">
-          <div className="col-12">
-            <AdaptiveLearningCard path={adaptivePath} />
+        {user?.verification === "verified" && (
+          <div className="row g-3 mt-3">
+            <div className="col-12">
+              <AdaptiveLearningCard path={adaptivePath} />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="row g-3 mt-3">
           <div className="col-lg-12">
             <div className="battle-dashboard-card">
-              <div>
+              {user?.verification === "verified" && <div>
                 <span className="dashboard-badge">Competitive Learning</span>
                 <h4 className="fw-bold mt-2 mb-1">Battle Mode</h4>
                 <p className="text-muted mb-0">
                   Challenge classmates using the same approved exam questions. Compete
                   by score and completion time on the leaderboard.
                 </p>
-              </div>
+              </div>}
 
-              <Link className="btn btn-success" to="/student/battle">
-                Start Battle
-              </Link>
+              {user?.verification === "verified" && (
+                <Link className="btn btn-success" to="/student/battle">
+                  Start Battle
+                </Link>
+              )}
             </div>
           </div>
         </div>

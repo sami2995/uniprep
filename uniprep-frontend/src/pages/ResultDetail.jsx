@@ -49,6 +49,25 @@ const ResultDetail = () => {
         <div className="col-md-4">
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body">
+              <h6 className="text-muted">Question Source</h6>
+              {result.source_breakdown?.official === result.questions.length ? (
+                <h5 className="fw-bold mb-0">
+                  {result.source_breakdown.official} Official MOE Questions
+                </h5>
+              ) : (
+                <div className="small">
+                  <div>✓ Official MOE: {result.source_breakdown?.official || 0}</div>
+                  <div>✓ Instructor-authored: {result.source_breakdown?.instructor || 0}</div>
+                  <div className="fw-bold">Total: {result.questions.length}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-4">
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body">
               <h6 className="text-muted">Questions</h6>
               <h2 className="fw-bold">{result.questions.length}</h2>
             </div>

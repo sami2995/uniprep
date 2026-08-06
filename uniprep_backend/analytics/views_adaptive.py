@@ -25,6 +25,23 @@ def is_student(user):
     return getattr(user, "role", None) == "student"
 
 
+def verification_required_response(user):
+    return Response(
+        {
+            "error": (
+                "Your account is pending verification. You can use personal study "
+                "features, but exit exam content requires institutional verification."
+            ),
+            "verification_status": getattr(user, "verification", "pending"),
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def verified_student_required(request):
+    return is_student(request.user) and request.user.verification != "verified"
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def current_learning_path(request):
@@ -145,6 +162,8 @@ def topic_summary_view(request):
     Summary step of the Adaptive Learning path.
     """
     user = request.user
+    if verified_student_required(request):
+        return verification_required_response(user)
     if not is_student(user):
         return Response(
             {"detail": "Only students can access adaptive learning content."},
@@ -197,6 +216,8 @@ def topic_flashcards_view(request):
     Quiz and Mini Mock steps remain AI-FREE (direct exam bank question selection).
     """
     user = request.user
+    if verified_student_required(request):
+        return verification_required_response(user)
     if not is_student(user):
         return Response(
             {"detail": "Only students can access adaptive learning content."},
@@ -250,6 +271,8 @@ def adaptive_quiz_questions(request):
     adaptive learning path topic. Inline step for AdaptiveLearningPage.
     """
     user = request.user
+    if verified_student_required(request):
+        return verification_required_response(user)
     if not is_student(user):
         return Response(
             {"detail": "Only students can take adaptive quizzes."},
@@ -305,6 +328,8 @@ def submit_adaptive_quiz(request):
     Backend calculates the real score; frontend-submitted scores are ignored.
     """
     user = request.user
+    if verified_student_required(request):
+        return verification_required_response(user)
     if not is_student(user):
         return Response(
             {"detail": "Only students can submit adaptive quizzes."},
@@ -362,6 +387,8 @@ def complete_mini_mock_step(request):
     Mini Mock attempt exists for the current adaptive path topic.
     """
     user = request.user
+    if verified_student_required(request):
+        return verification_required_response(user)
     if not is_student(user):
         return Response(
             {"detail": "Only students can complete mini mock steps."},

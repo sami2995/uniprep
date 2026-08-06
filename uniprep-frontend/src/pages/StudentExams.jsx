@@ -19,6 +19,12 @@ const StudentExams = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const modeSubtitles = {
+    blueprint: "Uses official MOE questions only · Blueprint-based · Best readiness estimate",
+    course: "Practice with official + instructor questions · Randomized every attempt",
+    weak_topic: "Adaptive AI practice focused on your weakest areas",
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -150,10 +156,11 @@ const StudentExams = () => {
                     value={mode}
                     onChange={(e) => setMode(e.target.value)}
                   >
-                    <option value="course">Normal Mock Exam</option>
-                    <option value="blueprint">Blueprint Exit Exam Simulation</option>
-                    <option value="weak_topic">Practice Weak Topic</option>
+                    <option value="blueprint">Official Exit Exam</option>
+                    <option value="course">Practice Mock</option>
+                    <option value="weak_topic">Weak Topic Practice</option>
                   </select>
+                  <div className="form-text mt-2">{modeSubtitles[mode]}</div>
                 </div>
 
                 {mode === "course" && (

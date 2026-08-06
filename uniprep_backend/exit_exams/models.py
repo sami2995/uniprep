@@ -691,6 +691,7 @@ class SystemSettings(models.Model):
     mastery_threshold_accuracy = models.PositiveIntegerField(default=80)
     mastery_minimum_attempts = models.PositiveIntegerField(default=3)
     quiz_unlock_score = models.PositiveIntegerField(default=70)
+    restrict_blueprint_to_official_questions = models.BooleanField(default=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

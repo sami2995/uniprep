@@ -1,7 +1,7 @@
 """
 Tests for question selection consolidation and approved-only enforcement.
 """
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -41,12 +41,19 @@ def _create_test_hierarchy():
     return department, course, domain, topic
 
 
-def _create_question(topic, text, status=Question.Status.APPROVED, is_active=True):
+def _create_question(
+    topic,
+    text,
+    status=Question.Status.APPROVED,
+    is_active=True,
+    source_type=Question.SourceType.MANUAL,
+):
     question = Question.objects.create(
         topic=topic,
         text=text,
         status=status,
         is_active=is_active,
+        source_type=source_type,
     )
     for i, choice_text in enumerate(["A", "B", "C", "D"]):
         Choice.objects.create(
@@ -63,6 +70,7 @@ def _create_student(department=None):
         email="student@test.com",
         password="testpass123",
         role="student",
+        verification="verified",
         department=department,
     )
 
@@ -199,7 +207,11 @@ class BlueprintSelectorTests(TestCase):
             question_count=3
         )
         for i in range(3):
-            _create_question(self.topic, f"Blueprint q{i}")
+            _create_question(
+                self.topic,
+                f"Blueprint q{i}",
+                source_type=Question.SourceType.IMPORTED,
+            )
 
     def test_blueprint_generation_returns_correct_count(self):
         selected, report, warnings = select_questions_for_blueprint(
@@ -211,7 +223,12 @@ class BlueprintSelectorTests(TestCase):
         self.assertFalse(warnings)
 
     def test_blueprint_generation_uses_only_approved_active(self):
-        _create_question(self.topic, "Draft", status=Question.Status.DRAFT)
+        _create_question(
+            self.topic,
+            "Draft",
+            status=Question.Status.DRAFT,
+            source_type=Question.SourceType.IMPORTED,
+        )
         selected, _, _ = select_questions_for_blueprint(
             self.student, self.blueprint
         )
@@ -220,6 +237,11 @@ class BlueprintSelectorTests(TestCase):
             self.assertTrue(q.is_active)
 
 
+@override_settings(
+    CHANNEL_LAYERS={
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+)
 class GenerateMockExamApprovedOnlyTests(TestCase):
     """API tests ensuring generate-mock-exam never returns unapproved questions."""
 
@@ -295,7 +317,11 @@ class GenerateMockExamApprovedOnlyTests(TestCase):
             question_count=2
         )
         for i in range(2):
-            _create_question(self.topic, f"Approved {i}")
+            _create_question(
+                self.topic,
+                f"Approved {i}",
+                source_type=Question.SourceType.IMPORTED,
+            )
         response = self.client.post(
             "/api/exit-exams/generate-mock-exam/",
             {"blueprint_id": blueprint.id}
@@ -305,8 +331,63 @@ class GenerateMockExamApprovedOnlyTests(TestCase):
             q = Question.objects.get(id=mq["question"]["id"])
             self.assertEqual(q.status, Question.Status.APPROVED)
             self.assertTrue(q.is_active)
+            self.assertEqual(q.source_type, Question.SourceType.IMPORTED)
+
+    def test_course_mode_remains_mixed(self):
+        _create_question(
+            self.topic,
+            "Official course question",
+            source_type=Question.SourceType.IMPORTED,
+        )
+        _create_question(self.topic, "Instructor course question")
+        response = self.client.post(
+            "/api/exit-exams/generate-mock-exam/",
+            {"course_id": self.course.id, "total_questions": 2},
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        source_types = {
+            Question.objects.get(id=mq["question"]["id"]).source_type
+            for mq in response.data["mock_exam"]["mock_questions"]
+        }
+        self.assertEqual(
+            source_types,
+            {Question.SourceType.IMPORTED, Question.SourceType.MANUAL},
+        )
+
+    def test_blueprint_errors_when_official_questions_are_insufficient(self):
+        _create_question(self.topic, "Instructor only")
+        blueprint = ExamBlueprint.objects.create(
+            course=self.course,
+            title="Insufficient Blueprint",
+            total_questions=3,
+        )
+        ExamBlueprintTopicRule.objects.create(
+            blueprint=blueprint,
+            topic=self.topic,
+            question_count=3,
+        )
+        response = self.client.post(
+            "/api/exit-exams/generate-mock-exam/",
+            {"blueprint_id": blueprint.id},
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"],
+            "Not enough official exam questions available for this blueprint. "
+            "Only 0 of 3 required questions found in the official question bank.",
+        )
+        practice_response = self.client.post(
+            "/api/exit-exams/generate-mock-exam/",
+            {"course_id": self.course.id, "total_questions": 1},
+        )
+        self.assertEqual(practice_response.status_code, status.HTTP_201_CREATED)
 
 
+@override_settings(
+    CHANNEL_LAYERS={
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+)
 class SubmitMockExamUpdatesTests(TestCase):
     """Tests that real mini mock submission creates records and updates readiness."""
 
@@ -375,6 +456,61 @@ class SubmitMockExamUpdatesTests(TestCase):
         self.assertEqual(float(readiness.score), float(response.data["readiness_score"]))
 
 
+class ResultSourceBreakdownTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.department, self.course, self.domain, self.topic = _create_test_hierarchy()
+        self.student = _create_student(self.department)
+        self.client.force_authenticate(user=self.student)
+        self.official = _create_question(
+            self.topic,
+            "Official result question",
+            source_type=Question.SourceType.IMPORTED,
+        )
+        self.instructor = _create_question(
+            self.topic,
+            "Instructor result question",
+            source_type=Question.SourceType.MANUAL,
+        )
+        mock_exam = MockExam.objects.create(
+            student=self.student,
+            course=self.course,
+            title="Practice Mock 1",
+            exam_number=1,
+            total_questions=2,
+        )
+        attempt = ExamAttempt.objects.create(
+            mock_exam=mock_exam,
+            student=self.student,
+            status=ExamAttempt.Status.SUBMITTED,
+        )
+        for question in (self.official, self.instructor):
+            AttemptDetail.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_choice=question.choices.first(),
+                is_correct=False,
+            )
+        self.attempt = attempt
+
+    def test_results_compute_source_breakdown_live(self):
+        response = self.client.get("/api/exit-exams/my-results/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["results"][0]["source_breakdown"],
+            {"official": 1, "instructor": 1},
+        )
+
+        detail_response = self.client.get(
+            f"/api/exit-exams/my-results/{self.attempt.id}/"
+        )
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            detail_response.data["source_breakdown"],
+            {"official": 1, "instructor": 1},
+        )
+
+
 class StudentPickerDepartmentScopingTests(TestCase):
     """Ensure course/topic/blueprint picker endpoints are scoped to the student's department."""
 
@@ -421,6 +557,7 @@ class StudentPickerDepartmentScopingTests(TestCase):
             email="ba_scoped@test.com",
             password="testpass123",
             role="student",
+            verification="verified",
             department=self.ba_department,
         )
 
