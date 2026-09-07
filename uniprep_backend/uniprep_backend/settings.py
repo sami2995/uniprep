@@ -78,7 +78,10 @@ database_url = (
     or config('MYSQLPUBLICURL', default=None)
     or config('MYSQL_PUBLIC_URL', default=None)
 )
-use_sqlite = config('USE_SQLITE', default=False, cast=bool) or config('DB_ENGINE', default='').lower() in {'sqlite', 'sqlite3'}
+use_sqlite = (
+    str(config('USE_SQLITE', default='false')).lower() in {'true', '1', 'yes', 'on'}
+    or config('DB_ENGINE', default='').lower() in {'sqlite', 'sqlite3'}
+)
 
 db_options = {
     'charset': 'utf8mb4',
