@@ -68,6 +68,7 @@ ASGI_APPLICATION = "uniprep_backend.asgi.application"  # needed for Channels/Web
 db_ssl_setting = config('DB_SSL', default=None)
 db_host = config('DB_HOST', default='localhost')
 database_url = config('DATABASE_URL', default=None)
+use_sqlite = config('USE_SQLITE', default=False, cast=bool) or config('DB_ENGINE', default='').lower() in {'sqlite', 'sqlite3'}
 
 db_options = {
     'charset': 'utf8mb4',
@@ -80,7 +81,8 @@ use_ssl = False
 if db_ssl_setting is not None:
     use_ssl = str(db_ssl_setting).lower() in {'true', '1', 'yes', 'required', 'preferred'}
 elif db_host not in {'localhost', '127.0.0.1', 'db', ''} or (database_url and 'localhost' not in database_url and '127.0.0.1' not in database_url):
-    use_ssl = True
+    # Only default to SSL if not disabled
+    use_ssl = config('DB_SSL_DISABLED', default='false').lower() not in {'true', '1', 'yes'}
 
 if use_ssl:
     ssl_context = ssl.create_default_context()
@@ -88,18 +90,35 @@ if use_ssl:
     ssl_context.verify_mode = ssl.CERT_NONE
     db_options['ssl'] = ssl_context
 
-if database_url:
-    parsed_url = urllib.parse.urlparse(database_url)
+if use_sqlite:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': parsed_url.path.lstrip('/'),
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+elif database_url:
+    parsed_url = urllib.parse.urlparse(database_url)
+    if parsed_url.scheme.startswith('postgres'):
+        engine = 'django.db.backends.postgresql'
+        options = {}
+    elif parsed_url.scheme.startswith('sqlite'):
+        engine = 'django.db.backends.sqlite3'
+        options = {}
+    else:
+        engine = 'django.db.backends.mysql'
+        options = db_options
+
+    DATABASES = {
+        'default': {
+            'ENGINE': engine,
+            'NAME': parsed_url.path.lstrip('/') or (str(BASE_DIR / 'db.sqlite3') if engine.endswith('sqlite3') else ''),
             'USER': parsed_url.username or '',
             'PASSWORD': urllib.parse.unquote(parsed_url.password or ''),
             'HOST': parsed_url.hostname or 'localhost',
             'PORT': str(parsed_url.port or 3306),
             'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=0, cast=int),
-            'OPTIONS': db_options,
+            'OPTIONS': options,
         }
     }
 else:

@@ -33,7 +33,17 @@ const Login = () => {
 
       navigate(getDefaultPathForRole(user.role));
     } catch (err) {
-      setError("Invalid username or password.");
+      if (err.code === "ERR_NETWORK" || err.message?.toLowerCase().includes("network")) {
+        setError("Cannot connect to server. Please check your connection or backend status.");
+      } else if (err.response?.status >= 500) {
+        setError(`Server error (${err.response.status}): The backend database or service is unavailable.`);
+      } else if (err.response?.data?.detail) {
+        setError(err.response.data.detail);
+      } else if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError("Invalid username or password.");
+      }
     } finally {
       setLoading(false);
     }

@@ -47,6 +47,52 @@ const Register = () => {
     });
   };
 
+  const getErrorMessage = (err) => {
+    if (!err) return "Registration failed. Please try again.";
+
+    if (err.code === "ERR_NETWORK" || err.message?.toLowerCase().includes("network")) {
+      return "Cannot connect to server. Please check your internet connection or verify the backend service status.";
+    }
+
+    const response = err.response;
+    if (!response) {
+      return err.message || "Registration failed. Please try again.";
+    }
+
+    const { status, data } = response;
+
+    if (status >= 500) {
+      return `Server error (${status}): The backend database or service is temporarily unavailable. Please try again in a moment.`;
+    }
+
+    if (typeof data === "string") {
+      if (data.includes("<html") || data.includes("<!DOCTYPE")) {
+        return `Server returned an error page (${status}). Please try again later.`;
+      }
+      return data;
+    }
+
+    if (typeof data === "object" && data !== null) {
+      if (data.detail) return data.detail;
+      if (data.error) return data.error;
+
+      const entries = Object.entries(data);
+      if (entries.length > 0) {
+        return entries
+          .map(([field, value]) => {
+            const formattedField = field
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+            const text = Array.isArray(value) ? value.join(" ") : String(value);
+            return field === "non_field_errors" ? text : `${formattedField}: ${text}`;
+          })
+          .join(" | ");
+      }
+    }
+
+    return `Registration failed (${status}). Please check your inputs and try again.`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -62,12 +108,7 @@ const Register = () => {
       await register(form);
       navigate("/login");
     } catch (err) {
-      const data = err.response?.data;
-      const messages = Object.entries(data || {}).flatMap(([field, value]) => {
-        const label = field === "detail" ? "" : `${field}: `;
-        return [`${label}${Array.isArray(value) ? value.join(" ") : value}`];
-      });
-      setError(messages.length ? messages.join(" ") : "Registration failed. Check your inputs.");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
