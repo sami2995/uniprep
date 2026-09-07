@@ -30,7 +30,8 @@ const Register = () => {
         const response = await api.get("/users/registration-departments/");
         setDepartments(response.data || []);
       } catch {
-        setError("Unable to load departments. Please try again.");
+        // Allow registering without departments if DB has no departments
+        setDepartments([]);
       } finally {
         setDepartmentsLoading(false);
       }
@@ -128,6 +129,7 @@ const Register = () => {
                         className="form-control"
                         value={form.student_id}
                         onChange={handleChange}
+                        placeholder="Optional"
                       />
                     </div>
 
@@ -144,24 +146,37 @@ const Register = () => {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label">Department</label>
-                    <select
-                      name="department"
-                      className="form-control"
-                      value={form.department}
-                      onChange={handleChange}
-                      required
-                      disabled={departmentsLoading}
-                    >
-                      <option value="">
-                        {departmentsLoading ? "Loading departments..." : "Select your department"}
-                      </option>
-                      {departments.map((department) => (
-                        <option key={department.id} value={department.name}>
-                          {department.name}
+                    <label className="form-label">
+                      Department <span className="text-muted small fw-normal">(optional)</span>
+                    </label>
+                    {departments.length > 0 ? (
+                      <select
+                        name="department"
+                        className="form-control"
+                        value={form.department}
+                        onChange={handleChange}
+                        disabled={departmentsLoading}
+                      >
+                        <option value="">
+                          {departmentsLoading ? "Loading departments..." : "Select your department (optional)"}
                         </option>
-                      ))}
-                    </select>
+                        {departments.map((department) => (
+                          <option key={department.id} value={department.name}>
+                            {department.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        name="department"
+                        className="form-control"
+                        placeholder="e.g. Computer Science (optional)"
+                        value={form.department}
+                        onChange={handleChange}
+                        disabled={departmentsLoading}
+                      />
+                    )}
                   </div>
 
                   <div className="mb-3">

@@ -36,7 +36,7 @@ export const SIDEBAR_LINKS = {
     { label: "My Teaching Topics", path: "/teacher/courses", icon: "GraduationCap" },
     { label: "Create My Questions", path: "/teacher/questions", icon: "CircleHelp" },
     { label: "Upload Exam PDF", path: "/teacher/pdf-imports", icon: "FileText" },
-    { label: "Materials", path: "/teacher/materials", icon: "BookOpen" },
+    // { label: "Materials", path: "/teacher/materials", icon: "BookOpen" },
     { label: "Analytics", path: "/teacher/analytics", icon: "BarChart3" },
   ],
   [ROLES.DEPARTMENT_HEAD]: [

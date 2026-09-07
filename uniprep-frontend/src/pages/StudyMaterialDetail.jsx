@@ -8,7 +8,18 @@ import {
 } from "lucide-react";
 import api from "../api/api";
 
-/* ── Tab definitions ── */
+/* ── Quiz timer (client-side only; 1.5 min per question) ── */
+const SECONDS_PER_QUIZ_QUESTION = 90;
+
+const quizDurationSeconds = (questionCount) =>
+  Math.round(Math.max(1, questionCount || 1) * SECONDS_PER_QUIZ_QUESTION);
+
+const formatQuizTimer = (seconds) => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
+
 const TABS = [
   { key: "summary",    label: "Summary",    icon: FileText      },
   { key: "ask",        label: "Chat",       icon: MessageSquare },
@@ -33,6 +44,10 @@ const StudyMaterialDetail = () => {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizResult,    setQuizResult]    = useState(null);  // server-scored attempt (answers keyed by question id)
   const [quizSubmitting,setQuizSubmitting]= useState(false);
+  const [quizTimeLeft,    setQuizTimeLeft]    = useState(null);
+  const [quizTimerRunning,setQuizTimerRunning]= useState(false);
+  const quizTimerRef = useRef(null);
+  const autoSubmittingRef = useRef(false);
   const [activeTab,     setActiveTab]     = useState("summary");
   const [loadingAction, setLoadingAction] = useState("");
   const [error,         setError]         = useState("");
@@ -63,6 +78,48 @@ const StudyMaterialDetail = () => {
 
   useEffect(() => { fetchMaterial(); }, [materialId]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
+
+  const clearQuizTimer = () => {
+    if (quizTimerRef.current) {
+      clearInterval(quizTimerRef.current);
+      quizTimerRef.current = null;
+    }
+  };
+
+  const stopQuizTimer = () => {
+    clearQuizTimer();
+    setQuizTimerRunning(false);
+    setQuizTimeLeft(null);
+  };
+
+  const startQuizTimer = (questionCount) => {
+    clearQuizTimer();
+    autoSubmittingRef.current = false;
+    setQuizTimeLeft(quizDurationSeconds(questionCount));
+    setQuizTimerRunning(true);
+  };
+
+  useEffect(() => () => clearQuizTimer(), []);
+
+  useEffect(() => {
+    if (!quizTimerRunning || quizSubmitted) {
+      clearQuizTimer();
+      return undefined;
+    }
+
+    quizTimerRef.current = setInterval(() => {
+      setQuizTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          setQuizTimerRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearQuizTimer();
+  }, [quizTimerRunning, quizSubmitted]);
+
 
   const fetchMaterial = async () => {
     try {
@@ -98,8 +155,14 @@ const StudyMaterialDetail = () => {
         setConfidence(confidences);
         setQuizResult(result);
         setQuizSubmitted(true);
+        stopQuizTimer();
       } else {
         setQuizAnswers({}); setConfidence({}); setQuizSubmitted(false); setQuizResult(null);
+        if (quizRes.data?.questions?.length > 0) {
+          startQuizTimer(quizRes.data.questions.length);
+        } else {
+          stopQuizTimer();
+        }
       }
     } catch (e) {
       // Silently ignore individual failures; user can still regenerate.
@@ -176,12 +239,15 @@ const StudyMaterialDetail = () => {
 
   const generateQuiz = async () => {
     setError(""); setLoadingAction("quiz");
+    stopQuizTimer();
     setQuizAnswers({}); setConfidence({}); setQuizSubmitted(false); setQuizResult(null);
     try {
       const res = await api.post(`/rag/materials/${materialId}/generate-quiz/`, {
         question_count: effectiveQuizCount(),
       });
       setQuiz(res.data);
+      const count = res.data?.questions?.length || effectiveQuizCount();
+      startQuizTimer(count);
     } catch (e) {
       setError(e.response?.data?.detail || "Failed to generate quiz.");
     } finally { setLoadingAction(""); }
@@ -211,8 +277,10 @@ const StudyMaterialDetail = () => {
     };
   };
 
-  const checkAnswers = async () => {
-    if (!quiz) return;
+  const submitQuiz = async ({ auto = false } = {}) => {
+    if (!quiz || quizSubmitted || quizSubmitting) return;
+    if (auto && autoSubmittingRef.current) return;
+
     const quizId = quiz.quiz_id || quiz.id;
     if (!quizId) return;
 
@@ -222,27 +290,45 @@ const StudyMaterialDetail = () => {
       confidence: confidence[qId] || "",
     }));
 
-    if (answered.length === 0) {
+    if (!auto && answered.length === 0) {
       setError("Please answer at least one question before checking answers.");
       return;
     }
 
+    if (auto) autoSubmittingRef.current = true;
+    stopQuizTimer();
     setError(""); setQuizSubmitting(true);
     try {
-    const res = await api.post(
+      const res = await api.post(
         `/rag/materials/${materialId}/quiz/submit/`,
         { quiz_id: quizId, answers: answered }
       );
       const { result } = hydrateAttempt(res.data);
       setQuizResult(result);
-    setQuizSubmitted(true);
+      setQuizSubmitted(true);
     } catch (e) {
+      if (auto) autoSubmittingRef.current = false;
       setError(e.response?.data?.detail || "Failed to submit quiz.");
-    } finally { setQuizSubmitting(false); }
+    } finally {
+      setQuizSubmitting(false);
+    }
   };
 
+  const checkAnswers = () => submitQuiz({ auto: false });
+
+  useEffect(() => {
+    if (quizTimeLeft !== 0 || quizSubmitted || quizSubmitting || !quiz) return;
+    submitQuiz({ auto: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizTimeLeft, quizSubmitted, quizSubmitting, quiz]);
+
   const resetQuiz = () => {
+    stopQuizTimer();
+    autoSubmittingRef.current = false;
     setQuizAnswers({}); setConfidence({}); setQuizSubmitted(false); setQuizResult(null);
+    if (quiz?.questions?.length > 0) {
+      startQuizTimer(quiz.questions.length);
+    }
   };
 
   /* ── Audio ── */
@@ -693,6 +779,15 @@ const StudyMaterialDetail = () => {
 
           {quiz?.ai_status === "fallback_generated" && (
             <div className="alert alert-warning small">AI quiz generation unavailable — showing fallback questions.</div>
+          )}
+
+          {quizTimeLeft !== null && !quizSubmitted && (
+            <div className="alert alert-primary d-flex justify-content-between align-items-center py-2 mb-3">
+              <span className="fw-semibold">Time Remaining</span>
+              <span className={`fs-5 fw-bold ${quizTimeLeft <= 10 ? "text-danger" : ""}`} style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatQuizTimer(quizTimeLeft)}
+              </span>
+            </div>
           )}
 
           {quiz?.questions?.length > 0 && (

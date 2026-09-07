@@ -355,7 +355,7 @@ class StudentVerificationAccessTests(TestCase):
         self.assertEqual(mock.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(questions.data["verification_status"], "pending")
 
-    def test_registration_requires_department(self):
+    def test_registration_without_department_succeeds(self):
         response = self.client.post(
             "/api/users/register/",
             {
@@ -366,9 +366,10 @@ class StudentVerificationAccessTests(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("department", response.data)
-        self.assertFalse(User.objects.filter(username="missing_department").exists())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        student = User.objects.get(username="missing_department")
+        self.assertIsNone(student.department)
+        self.assertEqual(student.verification, "pending")
 
     def test_verification_rejects_student_without_department(self):
         student = User.objects.create_user(
