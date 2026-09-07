@@ -1,3 +1,5 @@
+import ssl
+import urllib.parse
 from decouple import config
 from pathlib import Path
 from datetime import timedelta
@@ -10,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')  # move to .env
 DEBUG = str(config('DEBUG', default='True')).lower() in {'1', 'true', 'yes', 'on'}
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com', '.vercel.app', '*']
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -63,16 +65,56 @@ TEMPLATES = [
 WSGI_APPLICATION = "uniprep_backend.wsgi.application"
 ASGI_APPLICATION = "uniprep_backend.asgi.application"  # needed for Channels/WebSocket
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': config('DB_NAME', default='uniprep_db'),
-        'USER': config('DB_USER', default='root'),
-        'PASSWORD': config('DB_PASSWORD', default='uniprep1'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='3306'),
-    }
+db_ssl_setting = config('DB_SSL', default=None)
+db_host = config('DB_HOST', default='localhost')
+database_url = config('DATABASE_URL', default=None)
+
+db_options = {
+    'charset': 'utf8mb4',
+    'connect_timeout': 60,
+    'read_timeout': 60,
+    'write_timeout': 60,
 }
+
+use_ssl = False
+if db_ssl_setting is not None:
+    use_ssl = str(db_ssl_setting).lower() in {'true', '1', 'yes', 'required', 'preferred'}
+elif db_host not in {'localhost', '127.0.0.1', 'db', ''} or (database_url and 'localhost' not in database_url and '127.0.0.1' not in database_url):
+    use_ssl = True
+
+if use_ssl:
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    db_options['ssl'] = ssl_context
+
+if database_url:
+    parsed_url = urllib.parse.urlparse(database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': parsed_url.path.lstrip('/'),
+            'USER': parsed_url.username or '',
+            'PASSWORD': urllib.parse.unquote(parsed_url.password or ''),
+            'HOST': parsed_url.hostname or 'localhost',
+            'PORT': str(parsed_url.port or 3306),
+            'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=0, cast=int),
+            'OPTIONS': db_options,
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': config('DB_NAME', default='uniprep_db'),
+            'USER': config('DB_USER', default='root'),
+            'PASSWORD': config('DB_PASSWORD', default='uniprep1'),
+            'HOST': db_host,
+            'PORT': str(config('DB_PORT', default='3306')),
+            'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=0, cast=int),
+            'OPTIONS': db_options,
+        }
+    }
 
 AUTH_USER_MODEL = "users.CustomUser"
 
