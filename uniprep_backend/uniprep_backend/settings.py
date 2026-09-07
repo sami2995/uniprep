@@ -66,11 +66,17 @@ WSGI_APPLICATION = "uniprep_backend.wsgi.application"
 ASGI_APPLICATION = "uniprep_backend.asgi.application"  # needed for Channels/WebSocket
 
 db_ssl_setting = config('DB_SSL', default=None)
-db_host = config('DB_HOST', default='localhost')
+db_host = config('DB_HOST', default=config('MYSQLHOST', default='localhost'))
+db_port = str(config('DB_PORT', default=config('MYSQLPORT', default='3306')))
+db_user = config('DB_USER', default=config('MYSQLUSER', default='root'))
+db_password = config('DB_PASSWORD', default=config('MYSQLPASSWORD', default=config('MYSQL_ROOT_PASSWORD', default='uniprep1')))
+db_name = config('DB_NAME', default=config('MYSQLDATABASE', default='uniprep_db'))
+
 database_url = (
     config('DATABASE_URL', default=None)
     or config('MYSQL_URL', default=None)
     or config('MYSQLPUBLICURL', default=None)
+    or config('MYSQL_PUBLIC_URL', default=None)
 )
 use_sqlite = config('USE_SQLITE', default=False, cast=bool) or config('DB_ENGINE', default='').lower() in {'sqlite', 'sqlite3'}
 
@@ -129,11 +135,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': config('DB_NAME', default='uniprep_db'),
-            'USER': config('DB_USER', default='root'),
-            'PASSWORD': config('DB_PASSWORD', default='uniprep1'),
+            'NAME': db_name,
+            'USER': db_user,
+            'PASSWORD': db_password,
             'HOST': db_host,
-            'PORT': str(config('DB_PORT', default='3306')),
+            'PORT': db_port,
             'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=0, cast=int),
             'OPTIONS': db_options,
         }

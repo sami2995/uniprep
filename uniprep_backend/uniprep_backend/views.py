@@ -33,6 +33,8 @@ def health_check(request):
                 "status": db_status,
                 "engine": connection.settings_dict.get("ENGINE", ""),
                 "host": connection.settings_dict.get("HOST", ""),
+                "port": connection.settings_dict.get("PORT", ""),
+                "user": connection.settings_dict.get("USER", ""),
                 "name": connection.settings_dict.get("NAME", ""),
                 "table_count": table_count,
                 "sample_tables": tables,
