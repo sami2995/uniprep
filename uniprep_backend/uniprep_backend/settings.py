@@ -138,6 +138,7 @@ else:
 AUTH_USER_MODEL = "users.CustomUser"
 
 REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'uniprep_backend.exceptions.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),

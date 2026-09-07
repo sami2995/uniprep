@@ -3,6 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from uniprep_backend.views import health_check, trigger_migrate
 from analytics.views import (
     notifications,
     mark_notification_read,
@@ -13,6 +14,8 @@ from analytics.views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/health/", health_check, name="health_check"),
+    path("api/migrate/", trigger_migrate, name="trigger_migrate"),
 
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
