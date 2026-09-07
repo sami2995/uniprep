@@ -67,7 +67,11 @@ ASGI_APPLICATION = "uniprep_backend.asgi.application"  # needed for Channels/Web
 
 db_ssl_setting = config('DB_SSL', default=None)
 db_host = config('DB_HOST', default='localhost')
-database_url = config('DATABASE_URL', default=None)
+database_url = (
+    config('DATABASE_URL', default=None)
+    or config('MYSQL_URL', default=None)
+    or config('MYSQLPUBLICURL', default=None)
+)
 use_sqlite = config('USE_SQLITE', default=False, cast=bool) or config('DB_ENGINE', default='').lower() in {'sqlite', 'sqlite3'}
 
 db_options = {
@@ -77,12 +81,12 @@ db_options = {
     'write_timeout': 60,
 }
 
+# Only enable SSL if explicitly requested via DB_SSL=true or ssl parameter in database URL (Railway MySQL uses standard TCP)
 use_ssl = False
 if db_ssl_setting is not None:
     use_ssl = str(db_ssl_setting).lower() in {'true', '1', 'yes', 'required', 'preferred'}
-elif db_host not in {'localhost', '127.0.0.1', 'db', ''} or (database_url and 'localhost' not in database_url and '127.0.0.1' not in database_url):
-    # Only default to SSL if not disabled
-    use_ssl = config('DB_SSL_DISABLED', default='false').lower() not in {'true', '1', 'yes'}
+elif database_url and ('ssl=true' in database_url.lower() or 'sslmode=require' in database_url.lower()):
+    use_ssl = True
 
 if use_ssl:
     ssl_context = ssl.create_default_context()
